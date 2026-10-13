@@ -33,6 +33,7 @@ The following are development/publisher tools rather than APK payload:
 - `scripts/build-android-native.sh`: cross-builds Android runtime components, module services, probes and service tests; optional title compilation is controlled by `TRIAEVUM_BUILD_TITLE=1`.
 - `scripts/build-android-renderer.sh`: cross-builds and links the real renderer and a link/CPU-shader probe.
 - `tools/android/stage_native_app.py`: stages the exact ARM64 shared objects consumed by Gradle.
+- `.github/workflows/android-release.yml`: checks the AOT source inventory and shutdown API before native/Gradle packaging. It permits a placeholder AOT module only for non-publishing validation and fails closed for publishable builds unless a real translated title module is produced.
 - `tools/oot3d/**` AOT/runtime sources and tests, and `tools/triaevum_release/test_shutdown_request.py`: title, ABI, service, renderer-contract and shutdown validation.
 
 CMake test executables marked `EXCLUDE_FROM_ALL` are not automatically part of the Android app target. The native build script deliberately selects specific validation targets. Keep those tools: deleting them would remove the means to produce or verify the AOT title and Android native interfaces.
