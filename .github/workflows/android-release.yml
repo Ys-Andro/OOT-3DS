@@ -62,6 +62,11 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y ninja-build cmake libvulkan-dev
 
+      - name: Validate AOT source inventory and shutdown request
+        run: |
+          python3 -m unittest tools.triaevum_release.tests.test_translated_title_sources
+          python3 -m unittest tools.triaevum_release.test_shutdown_request
+
       - name: Locate Android SDK and NDK
         run: |
           echo "ANDROID_HOME=$ANDROID_HOME" >> $GITHUB_ENV
