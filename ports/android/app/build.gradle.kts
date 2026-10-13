@@ -46,7 +46,7 @@ tasks.register("checkNativeStage") {
         check(nativeStage.isPresent) {
             "Supply -PtriaevumNativeStage from the Android native build."
         }
-        val stageRoot = nativeStage.get().asFile
+        val stageRoot = file(nativeStage.get())
         val expectedAbis = setOf("arm64-v8a")
         val actualAbis = stageRoot.listFiles()
             ?.filter { it.isDirectory }
