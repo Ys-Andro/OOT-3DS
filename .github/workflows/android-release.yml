@@ -21,12 +21,12 @@ on:
         type: boolean
         default: true
       release_tag:
-        description: 'Release Tag (e.g. v0.6.0-android-alpha.1)'
+        description: 'Optional Release Tag override (e.g. v0.1.0)'
         required: false
         type: string
         default: ''
       prerelease:
-        description: 'Mark as pre-release'
+        description: 'Mark manual release as pre-release'
         required: true
         type: boolean
         default: false
@@ -85,7 +85,6 @@ jobs:
           mkdir -p title-source
           if [ -f "source.zip" ]; then
             unzip source.zip -d ./title-source/
-            # Normalize internal folders if zipped with a parent folder root
             if [ -d "./title-source/source" ]; then
               mv ./title-source/source/* ./title-source/
             fi
@@ -113,8 +112,6 @@ jobs:
           if [ -d "title-source" ] && [ "$(ls -A title-source)" ]; then
             echo "Compiling structural game code shards into true AOT binary..."
             mkdir -p build/title
-            
-            # Setup build structure using the project's native build parameters
             cmake -S ports/android/native -B build/native_title -G Ninja \
               -DCMAKE_TOOLCHAIN_FILE="$ANDROID_NDK_ROOT/build/cmake/android.toolchain.cmake" \
               -DANDROID_ABI=arm64-v8a \
@@ -123,11 +120,7 @@ jobs:
               -DCMAKE_BUILD_TYPE=Release \
               -DTRIAEVUM_BUILD_TITLE=1 \
               -DTRIAEVUM_TRANSLATED_TITLE_DIR="$(pwd)/title-source"
-            
-            # Build the game binary target target
             ninja -C build/native_title triaevum_android_title
-            
-            # Stage the created file exactly where the downstream python packer looks
             cp build/native_title/libtriaevum_title_aot.so build/title/libtriaevum_title_aot.so
           else
             echo "Skipping true AOT library build: title-source directory is missing or empty."
@@ -138,8 +131,6 @@ jobs:
           mkdir -p build/title_stub
           LLVM_DIR="$ANDROID_NDK_ROOT/toolchains/llvm/prebuilt/linux-x86_64/bin"
           CLANG="$LLVM_DIR/aarch64-linux-android29-clang"
-
-          # A stub is allowed only for PR plumbing checks; never ship it as a release.
           if [ ! -f "build/title/libtriaevum_title_aot.so" ]; then
             if [ "$GITHUB_EVENT_NAME" != "pull_request" ] && { [ "$GITHUB_EVENT_NAME" != "workflow_dispatch" ] || [ "${{ inputs.publish_release }}" = "true" ]; }; then
               echo "::error::Refusing to package a publishable build without the real whole-AOT title module."
@@ -159,7 +150,6 @@ jobs:
             echo "Using genuinely compiled whole-AOT game module."
             TITLE_MODULE="$(pwd)/build/title/libtriaevum_title_aot.so"
           fi
-
           python3 tools/android/stage_native_app.py \
             --runtime-build build/runtime \
             --title-module "$TITLE_MODULE" \
@@ -173,6 +163,8 @@ jobs:
           ports/android/gradlew -p ports/android :app:assembleDebug \
             -PtriaevumSdlSource="$(pwd)/build/runtime/_deps/sdl2-src" \
             -PtriaevumNativeStage="$(pwd)/build/staged_native_libs" \
+            -PtriaevumVersionCode="$GITHUB_RUN_NUMBER" \
+            -PtriaevumVersionName="0.1.$GITHUB_RUN_NUMBER" \
             --console=plain
 
       - name: Package Android APK artifact
@@ -181,7 +173,6 @@ jobs:
           APK_SOURCE="ports/android/app/build/outputs/apk/debug/app-debug.apk"
           if [ -f "$APK_SOURCE" ]; then
             cp "$APK_SOURCE" "dist/TriAevum-Oot3D-Android-arm64-v8a.apk"
-            echo "Release APK packaged successfully:"
             ls -lh dist/TriAevum-Oot3D-Android-arm64-v8a.apk
           else
             echo "Error: APK not found at $APK_SOURCE"
@@ -197,28 +188,30 @@ jobs:
 
       - name: Determine Release Tag
         id: release_info
-        if: startsWith(github.ref, 'refs/tags/v') || (github.event_name == 'workflow_dispatch' && inputs.publish_release)
+        if: startsWith(github.ref, 'refs/tags/v') || (github.event_name == 'workflow_dispatch' && inputs.publish_release) || (github.event_name == 'push' && github.ref == 'refs/heads/main')
         run: |
           if [ -n "${{ github.event.inputs.release_tag }}" ]; then
             TAG="${{ github.event.inputs.release_tag }}"
-          elif [[ "${{ github.ref }}" == refs/tags/* ]]; then
+          elif [[ "$GITHUB_REF" == refs/tags/* ]]; then
             TAG="${GITHUB_REF#refs/tags/}"
           else
-            TAG="v1.0.0-android"
+            TAG="v0.1.$GITHUB_RUN_NUMBER"
           fi
-          echo "tag=$TAG" >> $GITHUB_OUTPUT
+          echo "tag=$TAG" >> "$GITHUB_OUTPUT"
 
       - name: Publish GitHub Release
         uses: softprops/action-gh-release@v2
-        if: startsWith(github.ref, 'refs/tags/v') || (github.event_name == 'workflow_dispatch' && inputs.publish_release)
+        if: startsWith(github.ref, 'refs/tags/v') || (github.event_name == 'workflow_dispatch' && inputs.publish_release) || (github.event_name == 'push' && github.ref == 'refs/heads/main')
         with:
           tag_name: ${{ steps.release_info.outputs.tag }}
           name: ${{ steps.release_info.outputs.tag }}
-          prerelease: ${{ github.event.inputs.prerelease || contains(steps.release_info.outputs.tag, 'alpha') || contains(steps.release_info.outputs.tag, 'beta') }}
+          prerelease: ${{ github.event_name == 'workflow_dispatch' && inputs.prerelease || contains(steps.release_info.outputs.tag, 'alpha') || contains(steps.release_info.outputs.tag, 'beta') }}
           files: dist/TriAevum-Oot3D-Android-arm64-v8a.apk
           generate_release_notes: true
           body: |
             ### TriAevum Android Native Release (${{ steps.release_info.outputs.tag }})
 
             - **Platform**: Android ARM64
-            - **Status**: Full AOT game instruction module successfully compiled and linked directly.
+            - **Build**: ${{ github.run_number }}
+            - **Source commit**: ${{ github.sha }}
+            - Published automatically after a successful Android build.
