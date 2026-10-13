@@ -63,7 +63,7 @@ void SetAndroidStoragePath(const std::string &path) {
   gAndroidStoragePath = path;
 }
 
-const std::string &GetAndroidStoragePath() {
+std::string GetAndroidStoragePath() {
   std::lock_guard<std::mutex> lock(gStorageMutex);
   return gAndroidStoragePath;
 }
@@ -116,13 +116,12 @@ JNIEXPORT void JNICALL
 Java_org_triaevum_android_AndroidNativeInputTarget_nativeButton(
     JNIEnv * /*env*/, jclass /*clazz*/, jint hidMask, jboolean pressed) {
   auto &state = GetAndroidOverlayInputState();
-  uint32_t current = state.buttons.load(std::memory_order_relaxed);
+  const uint32_t mask = static_cast<uint32_t>(hidMask);
   if (pressed) {
-    current |= static_cast<uint32_t>(hidMask);
+    state.buttons.fetch_or(mask, std::memory_order_relaxed);
   } else {
-    current &= ~static_cast<uint32_t>(hidMask);
+    state.buttons.fetch_and(~mask, std::memory_order_relaxed);
   }
-  state.buttons.store(current, std::memory_order_relaxed);
 }
 
 JNIEXPORT void JNICALL
