@@ -77,6 +77,10 @@ public final class TriAevumConfigDialog extends Dialog {
 
     // Controles
     private CheckBox mCbShowOverlay;
+    private Spinner mSpAspectRatio;
+    private SeekBar mSbDisplaySize;
+    private TextView mTvDisplaySizeLabel;
+    private CheckBox mCbEditControlPositions;
     private SeekBar  mSbOpacity;
     private TextView mTvOpacityLabel;
     private CheckBox mCbHaptic;
@@ -169,6 +173,10 @@ public final class TriAevumConfigDialog extends Dialog {
 
         // Controles
         mCbShowOverlay       = findViewById(R.id.cb_show_overlay);
+        mSpAspectRatio = findViewById(R.id.sp_aspect_ratio);
+        mSbDisplaySize = findViewById(R.id.sb_display_size);
+        mTvDisplaySizeLabel = findViewById(R.id.tv_display_size_label);
+        mCbEditControlPositions = findViewById(R.id.cb_edit_control_positions);
         mSbOpacity           = findViewById(R.id.sb_overlay_opacity);
         mTvOpacityLabel      = findViewById(R.id.tv_opacity_label);
         mCbHaptic            = findViewById(R.id.cb_haptic);
@@ -292,6 +300,26 @@ public final class TriAevumConfigDialog extends Dialog {
             + " dpadIcons=" + mConfig.isRenderDpadIcons()
             + " itemsHint=" + mConfig.isRenderItemsHint());
 
+        // Display aspect ratio and size (applied on next game launch)
+        String[] aspectLabels = { "Pantalla completa (original)", "4:3", "16:9", "18:9", "20:9" };
+        setupSpinner(mSpAspectRatio, aspectLabels, null);
+        String aspectRatio = mPrefs.getString("TriAevum_DisplayAspectRatio", "full");
+        String[] aspectValues = { "full", "4:3", "16:9", "18:9", "20:9" };
+        for (int i = 0; i < aspectValues.length; i++) {
+            if (aspectValues[i].equals(aspectRatio)) { mSpAspectRatio.setSelection(i); break; }
+        }
+        int displaySize = mPrefs.getInt("TriAevum_DisplaySizePercent", 100);
+        mSbDisplaySize.setProgress(Math.max(0, Math.min(50, displaySize - 50)));
+        mTvDisplaySizeLabel.setText("Tamaño del área de juego: " + displaySize + "%");
+        mCbEditControlPositions.setChecked(mOverlay != null && mOverlay.isEditing);
+        mSbDisplaySize.setOnSeekBarChangeListener(new SeekBar.OnSeekBarChangeListener() {
+            @Override public void onProgressChanged(SeekBar sb, int progress, boolean fromUser) {
+                mTvDisplaySizeLabel.setText("Tamaño del área de juego: " + (progress + 50) + "%");
+            }
+            @Override public void onStartTrackingTouch(SeekBar sb) {}
+            @Override public void onStopTrackingTouch(SeekBar sb) {}
+        });
+
         // Controls — read directly from SharedPreferences (same keys as EmulationMenuSettings)
         boolean showOverlay = (mOverlay != null) ? mOverlay.isShowControls() : mPrefs.getBoolean("EmulationMenuSettings_ShowOverlay", true);
         boolean haptic      = (mOverlay != null) ? mOverlay.isHapticFeedbackEnabled() : mPrefs.getBoolean("EmulationMenuSettings_HapticFeedback", true);
@@ -412,11 +440,18 @@ public final class TriAevumConfigDialog extends Dialog {
         btnSave.setOnClickListener(v -> {
             String previousFrameRate = mConfig.getFrameRateMode();
             int previousSurfaceLimit = mConfig.getSurfaceMaxShortEdge();
+            String previousAspect = mPrefs.getString("TriAevum_DisplayAspectRatio", "full");
+            int previousDisplaySize = mPrefs.getInt("TriAevum_DisplaySizePercent", 100);
             saveToConfig();
             mConfig.applyLiveSettings();
+            String[] aspectValues = { "full", "4:3", "16:9", "18:9", "20:9" };
+            int aspectIndex = mSpAspectRatio.getSelectedItemPosition();
+            String newAspect = (aspectIndex >= 0 && aspectIndex < aspectValues.length) ? aspectValues[aspectIndex] : "full";
+            int newDisplaySize = mSbDisplaySize.getProgress() + 50;
             boolean restartRequired =
                 !previousFrameRate.equals(mConfig.getFrameRateMode()) ||
-                previousSurfaceLimit != mConfig.getSurfaceMaxShortEdge();
+                previousSurfaceLimit != mConfig.getSurfaceMaxShortEdge() ||
+                !previousAspect.equals(newAspect) || previousDisplaySize != newDisplaySize;
             String message = restartRequired
                 ? "Configuración guardada. Reinicia el juego para aplicar los cambios de FPS o resolución."
                 : "¡Configuración guardada y aplicada!";
@@ -430,6 +465,8 @@ public final class TriAevumConfigDialog extends Dialog {
             mConfig.restoreDefaults();
             mConfig.applyLiveSettings();
             mPrefs.edit()
+                .putString("TriAevum_DisplayAspectRatio", "full")
+                .putInt("TriAevum_DisplaySizePercent", 100)
                 .putBoolean("EmulationMenuSettings_ShowOverlay", true)
                 .putBoolean("EmulationMenuSettings_HapticFeedback", true)
                 .putBoolean("EmulationMenuSettings_SwapScreens", false)
@@ -438,6 +475,8 @@ public final class TriAevumConfigDialog extends Dialog {
                 .putBoolean("EmulationMenuSettings_DpadSlideEnable", true)
                 .apply();
             if (mOverlay != null) {
+                mOverlay.setEditing(false);
+                mOverlay.resetCustomLayout();
                 mOverlay.setShowControls(true);
                 mOverlay.setHapticFeedbackEnabled(true);
                 mOverlay.setTouchEnabled(false);
@@ -531,6 +570,14 @@ public final class TriAevumConfigDialog extends Dialog {
         mConfig.setRenderItemsHint(mCbItemsHint.isChecked());
 
         // Controles — write directly to SharedPreferences (same keys as EmulationMenuSettings)
+        String[] aspectValues = { "full", "4:3", "16:9", "18:9", "20:9" };
+        int aspectIndex = mSpAspectRatio.getSelectedItemPosition();
+        String aspect = (aspectIndex >= 0 && aspectIndex < aspectValues.length) ? aspectValues[aspectIndex] : "full";
+        mPrefs.edit()
+            .putString("TriAevum_DisplayAspectRatio", aspect)
+            .putInt("TriAevum_DisplaySizePercent", mSbDisplaySize.getProgress() + 50)
+            .apply();
+
         boolean showOverlay = mCbShowOverlay.isChecked();
         boolean haptic = mCbHaptic.isChecked();
         boolean swapScr = mCbSwapScreens.isChecked();
@@ -554,6 +601,7 @@ public final class TriAevumConfigDialog extends Dialog {
             .apply();
 
         if (mOverlay != null) {
+            mOverlay.setEditing(mCbEditControlPositions.isChecked());
             mOverlay.setShowControls(showOverlay);
             mOverlay.setHapticFeedbackEnabled(haptic);
             mOverlay.setTouchEnabled(touchScreen);
