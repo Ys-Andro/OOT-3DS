@@ -4616,6 +4616,12 @@ void GfxRenderingAPIVulkan::RecreateSwapchain() {
     if (mSurfaceLost) {
         try {
             RecreateSurface();
+#if defined(__ANDROID__)
+            // RecreateSwapchain has already waited for presents and device idle.
+            // RecreateSurface destroys the prior VkSurfaceKHR before making the
+            // new one, so detached ANativeWindow references are no longer used.
+            GfxWindowBackendAndroid::ReleaseRetiredNativeWindowsAfterSurfaceRecreated();
+#endif
         } catch (const std::exception& error) {
             __android_log_print(ANDROID_LOG_WARN, "TriAevum", "Surface recreation deferred: %s", error.what());
             mSwapchainDirty = true;
