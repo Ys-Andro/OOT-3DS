@@ -125,6 +125,20 @@
                 android:visibility="visible" />
 
             <Button
+                android:id="@+id/btn_import_citra_save"
+                android:layout_width="wrap_content"
+                android:layout_height="38dp"
+                android:layout_marginStart="12dp"
+                android:background="@drawable/btn_gold"
+                android:paddingStart="16dp"
+                android:paddingEnd="16dp"
+                android:text="Importar partida de Citra"
+                android:textAllCaps="false"
+                android:textColor="#0B0E14"
+                android:textSize="13sp"
+                android:visibility="gone" />
+
+            <Button
                 android:id="@+id/btn_change_directory"
                 android:layout_width="wrap_content"
                 android:layout_height="38dp"
