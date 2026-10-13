@@ -22,7 +22,7 @@ The following remain separate milestones and must not be represented as complete
 
 ## Android development
 
-See [Android native foundation](ports/android/README.md) for the qualified toolchain, native build scripts, and current limitations.
+See [Android native foundation](ports/android/README.md) for the qualified toolchain, native build scripts, and current limitations. For the product/dependency audit and Android acceptance gate, see [Android product audit](docs/ANDROID_PRODUCT_AUDIT.md).
 
 The native build and the APK packaging step are intentionally separate. `scripts/build-android-native.sh` builds native components; it explicitly does **not** produce a playable APK. The app's Gradle configuration requires a staged set of ARM64 shared libraries.
 
