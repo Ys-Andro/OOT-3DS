@@ -262,6 +262,7 @@ int RunOot3dNativeGameMain(int argc, char** argv) {
         WriteSwitchBootStatus("failed", ex.what());
 #endif
         DestroyContextForDemo();
+        return 1;
     }
 }
 
