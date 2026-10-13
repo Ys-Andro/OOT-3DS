@@ -17,13 +17,15 @@ jobs:
         distribution: 'zulu'
         java-version: '17'
 
-    - name: Setup Android SDK & NDK r29
-      uses: android-actions/setup-android@v3
+    - name: Setup Android SDK
+      uses: android-actions/setup-android@v4
+      with:
+        packages: platform-tools
 
     - name: Install NDK Component
       run: |
-        sdkmanager "ndk;29.0.14206865"
-        echo "ANDROID_NDK_HOME=${ANDROID_SDK_ROOT}/ndk/29.0.14206865" >> $GITHUB_ENV
+        sdkmanager "ndk;27.2.12479018"
+        echo "ANDROID_NDK_HOME=${ANDROID_SDK_ROOT}/ndk/27.2.12479018" >> $GITHUB_ENV
 
     - name: Extract Uploaded Shards
       run: |
