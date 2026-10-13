@@ -36,12 +36,12 @@ public final class TriAevumConfigManager {
     public static final String[] AA_MODE_LABELS   = { "Desactivado", "FXAA", "TAA", "MSAA 2x", "MSAA 4x" };
     public static final String[] AA_MODE_VALUES   = { "Off",       "FXAA", "TAA", "MSAA2x",  "MSAA4x"  };
 
-    public static final String[] FRAMERATE_LABELS = { "30 FPS (Original)", "60 FPS (Nativo)" };
+    public static final String[] FRAMERATE_LABELS = { "30 FPS (original, recomendado)", "60 FPS (interpolación)" };
     public static final String[] FRAMERATE_VALUES = { "Original30",         "Interpolated2x" };
 
     // ------- TriAevum.android.host.json ---
-    public static final String[] SURFACE_RES_LABELS = { "720p (predeterminado)", "1080p", "Sin límite" };
-    public static final int[]    SURFACE_RES_VALUES = { 720,              1080,                        0           };
+    public static final String[] SURFACE_RES_LABELS = { "480p (rendimiento)", "720p", "1080p", "Sin límite" };
+    public static final int[]    SURFACE_RES_VALUES = { 480,                    720,    1080,   0           };
 
     // ------- topscreen_ui.json ---
     public static final String[] HUD_LAYOUT_LABELS  = { "Normal (predeterminado)", "Restoration (MM3D)" };
@@ -115,7 +115,7 @@ public final class TriAevumConfigManager {
     // =========================================================================
 
     public int getSurfaceMaxShortEdge() {
-        return readJson("TriAevum.android.host.json").optInt("maximum_surface_short_edge", 720);
+        return readJson("TriAevum.android.host.json").optInt("maximum_surface_short_edge", 480);
     }
 
     public void setSurfaceMaxShortEdge(int value) {
@@ -213,6 +213,7 @@ public final class TriAevumConfigManager {
 
     public void setFrameRateMode(String mode) {
         patchGraphicsNested("FrameRate", "Mode", mode);
+        syncFrameRateLaunchProfile();
     }
 
     public boolean isVSync() {
@@ -414,7 +415,7 @@ public final class TriAevumConfigManager {
         // Language
         setLanguageCode("en");
         // Surface
-        setSurfaceMaxShortEdge(720);
+        setSurfaceMaxShortEdge(480);
         // Graphics
         setRenderScale(1.0f);
         setAAMode("Off");
@@ -435,9 +436,58 @@ public final class TriAevumConfigManager {
         setRenderDpadIcons(true);
     }
 
+    private void syncFrameRateLaunchProfile() {
+        File profileFile = new File(mExternalDir, "TriAevum.android.launch.json");
+        if (!profileFile.isFile()) return;
+        JSONObject profile = readJson("TriAevum.android.launch.json");
+        org.json.JSONArray args = profile.optJSONArray("arguments");
+        if (args == null) return;
+        String timing = "Interpolated2x".equals(getFrameRateMode())
+            ? "native30_interpolated" : "native30_no_interpolation";
+        String rate = "Interpolated2x".equals(getFrameRateMode()) ? "60" : "30";
+        try {
+            boolean changed = false;
+            boolean hasTiming = false;
+            boolean hasRate = false;
+            for (int i = 0; i + 1 < args.length(); i++) {
+                String arg = args.getString(i);
+                if ("--gameplay-timing".equals(arg)) {
+                    hasTiming = true;
+                    if (!timing.equals(args.getString(i + 1))) {
+                        args.put(i + 1, timing);
+                        changed = true;
+                    }
+                } else if ("--presentation-rate".equals(arg)) {
+                    hasRate = true;
+                    if (!rate.equals(args.getString(i + 1))) {
+                        args.put(i + 1, rate);
+                        changed = true;
+                    }
+                }
+            }
+            if (!hasTiming) {
+                args.put("--gameplay-timing");
+                args.put(timing);
+                changed = true;
+            }
+            if (!hasRate) {
+                args.put("--presentation-rate");
+                args.put(rate);
+                changed = true;
+            }
+            if (changed) {
+                profile.put("arguments", args);
+                writeJson("TriAevum.android.launch.json", profile);
+            }
+        } catch (JSONException e) {
+            Log.w(TAG, "Could not sync frame-rate launch arguments", e);
+        }
+    }
+
     /**
-     * Ensures TriAevum.android.launch.json enables visual interpolation and 60 Hz presentation,
-     * as well as --topscreen-config and --topscreen-texture-overrides for seamless single-screen UI layout customization.
+     * Keeps launch timing aligned with the selected graphics setting and ensures
+     * the TopScreen configuration and texture overrides are present.
+     * The default profile targets stable original 30 FPS on lower-end GPUs.
      */
     public void ensureLaunchProfileOptimized() {
         File atlasFile = new File(mContext.getExternalFilesDir(null), "atlas_overrides.o3tu");
@@ -464,13 +514,16 @@ public final class TriAevumConfigManager {
                 boolean hasTextureOverrides = false;
                 for (int i = 0; i < args.length() - 1; i++) {
                     if ("--gameplay-timing".equals(args.getString(i))) {
-                        if (!"native30_interpolated".equals(args.getString(i + 1))) {
-                            args.put(i + 1, "native30_interpolated");
+                        String timing = "Interpolated2x".equals(getFrameRateMode())
+                            ? "native30_interpolated" : "native30_no_interpolation";
+                        if (!timing.equals(args.getString(i + 1))) {
+                            args.put(i + 1, timing);
                             changed = true;
                         }
                     } else if ("--presentation-rate".equals(args.getString(i))) {
-                        if (!"60".equals(args.getString(i + 1))) {
-                            args.put(i + 1, "60");
+                        String rate = "Interpolated2x".equals(getFrameRateMode()) ? "60" : "30";
+                        if (!rate.equals(args.getString(i + 1))) {
+                            args.put(i + 1, rate);
                             changed = true;
                         }
                     } else if ("--topscreen-config".equals(args.getString(i))) {
@@ -491,7 +544,7 @@ public final class TriAevumConfigManager {
                 }
                 if (changed) {
                     writeJson("TriAevum.android.launch.json", profile);
-                    Log.i(TAG, "TriAevum.android.launch.json successfully updated for 60 FPS and TopScreen UI support");
+                    Log.i(TAG, "TriAevum.android.launch.json synchronized with selected frame rate and TopScreen UI support");
                 }
                 File topScreenFile = new File(mExternalDir, "topscreen_ui.json");
                 if (!topScreenFile.exists()) {
