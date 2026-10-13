@@ -10,7 +10,12 @@ class ShutdownRequest final {
   public:
     static_assert(std::atomic<bool>::is_always_lock_free);
 
+    static void Request() noexcept {
+        sRequested.store(true, std::memory_order_relaxed);
+    }
+
     static void HandleSignal(int) noexcept {
+        // Keep the signal handler limited to the already-proven lock-free store.
         sRequested.store(true, std::memory_order_relaxed);
     }
 

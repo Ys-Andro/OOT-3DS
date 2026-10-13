@@ -3,11 +3,9 @@ package org.triaevum.android;
 import android.app.Activity;
 import android.content.Context;
 import android.content.Intent;
-import android.content.pm.PackageManager;
 import android.net.Uri;
 import android.os.Build;
 import android.os.Bundle;
-import android.os.Environment;
 import android.os.Handler;
 import android.os.Looper;
 import android.os.SystemClock;
@@ -48,7 +46,6 @@ public class TriAevumDownloadActivity extends Activity {
 
     private static final String TAG = "TriAevumDownloader";
     private static final int REQUEST_CODE_PICK_ROM_DIR = 1001;
-    private static final int REQUEST_CODE_STORAGE_PERMISSION = 1002;
     private static final String PREFS_NAME = "org.triaevum.android_preferences";
     private static final String PREF_ROM_DIR_URI = "selected_rom_directory_uri";
 
@@ -203,49 +200,10 @@ public class TriAevumDownloadActivity extends Activity {
         finish();
     }
 
-    private void checkAndRequestStoragePermission() {
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
-            if (!Environment.isExternalStorageManager()) {
-                try {
-                    Intent intent = new Intent(android.provider.Settings.ACTION_MANAGE_APP_ALL_FILES_ACCESS_PERMISSION);
-                    intent.setData(Uri.parse("package:" + getPackageName()));
-                    startActivityForResult(intent, REQUEST_CODE_STORAGE_PERMISSION);
-                } catch (Exception e) {
-                    try {
-                        Intent intent = new Intent(android.provider.Settings.ACTION_MANAGE_ALL_FILES_ACCESS_PERMISSION);
-                        startActivityForResult(intent, REQUEST_CODE_STORAGE_PERMISSION);
-                    } catch (Exception ignored) {}
-                }
-            }
-        } else {
-            if (checkSelfPermission(android.Manifest.permission.READ_EXTERNAL_STORAGE) != PackageManager.PERMISSION_GRANTED ||
-                checkSelfPermission(android.Manifest.permission.WRITE_EXTERNAL_STORAGE) != PackageManager.PERMISSION_GRANTED) {
-                requestPermissions(new String[]{
-                    android.Manifest.permission.READ_EXTERNAL_STORAGE,
-                    android.Manifest.permission.WRITE_EXTERNAL_STORAGE
-                }, REQUEST_CODE_STORAGE_PERMISSION);
-            }
-        }
-    }
-
     private void requestStoragePermissionAndPickRomDirectory() {
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
-            if (!Environment.isExternalStorageManager()) {
-                checkAndRequestStoragePermission();
-            } else {
-                pickRomDirectory();
-            }
-        } else {
-            if (checkSelfPermission(android.Manifest.permission.READ_EXTERNAL_STORAGE) != PackageManager.PERMISSION_GRANTED ||
-                checkSelfPermission(android.Manifest.permission.WRITE_EXTERNAL_STORAGE) != PackageManager.PERMISSION_GRANTED) {
-                requestPermissions(new String[]{
-                    android.Manifest.permission.READ_EXTERNAL_STORAGE,
-                    android.Manifest.permission.WRITE_EXTERNAL_STORAGE
-                }, REQUEST_CODE_STORAGE_PERMISSION);
-            } else {
-                pickRomDirectory();
-            }
-        }
+        // ACTION_OPEN_DOCUMENT_TREE grants access to the user-selected tree;
+        // broad storage permissions are neither required nor requested.
+        pickRomDirectory();
     }
 
     private void pickRomDirectory() {
@@ -257,25 +215,8 @@ public class TriAevumDownloadActivity extends Activity {
     }
 
     @Override
-    public void onRequestPermissionsResult(int requestCode, String[] permissions, int[] grantResults) {
-        super.onRequestPermissionsResult(requestCode, permissions, grantResults);
-        if (requestCode == REQUEST_CODE_STORAGE_PERMISSION) {
-            if (grantResults.length > 0 && grantResults[0] == PackageManager.PERMISSION_GRANTED) {
-                pickRomDirectory();
-            } else {
-                showError("Permissão de armazenamento necessária para acessar a pasta da ROM");
-            }
-        }
-    }
-
-    @Override
     protected void onActivityResult(int requestCode, int resultCode, Intent data) {
         super.onActivityResult(requestCode, resultCode, data);
-        if (requestCode == REQUEST_CODE_STORAGE_PERMISSION) {
-            // Voltou das configurações de permissão — tentar abrir o seletor de pasta
-            pickRomDirectory();
-            return;
-        }
         if (requestCode == REQUEST_CODE_PICK_ROM_DIR && resultCode == RESULT_OK && data != null) {
             Uri uri = data.getData();
             if (uri != null) {

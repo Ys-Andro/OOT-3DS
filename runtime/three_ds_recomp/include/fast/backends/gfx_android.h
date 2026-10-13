@@ -54,13 +54,22 @@ class GfxWindowBackendAndroid final : public GfxWindowBackend {
     void* GetNativeWindow() const override;
     bool UsesVulkan() const override;
 
+    // NotifySurfaceCreated/Changed adopt an owned reference returned by fromSurface.
     static void NotifySurfaceCreated(ANativeWindow* window);
     static void NotifySurfaceChanged(ANativeWindow* window, uint32_t width, uint32_t height);
     static void NotifySurfaceDestroyed();
+    // Setter accepts a borrowed window and acquires an owned reference.
     static void SetGlobalNativeWindow(ANativeWindow* window);
+    // Returns a borrowed pointer valid while its backend-owned reference is retained.
     static ANativeWindow* GetGlobalNativeWindow();
     static void SetGlobalDimensions(uint32_t width, uint32_t height);
     static void SignalStop();
+    static void ResetStop();
+    // Call after the Vulkan device is idle and the previous VkSurfaceKHR has
+    // been destroyed/recreated successfully.
+    static void ReleaseRetiredNativeWindowsAfterSurfaceRecreated();
+    // Call only after the native game loop and renderer have fully stopped.
+    static void ReleaseNativeWindowsAfterRuntimeStopped();
     static bool IsSurfaceAvailable();
 
   private:

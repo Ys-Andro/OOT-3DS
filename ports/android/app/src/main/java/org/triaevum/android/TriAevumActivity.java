@@ -4,7 +4,6 @@ import android.app.Activity;
 import android.content.Context;
 import android.os.Build;
 import android.os.Bundle;
-import android.os.Process;
 import android.util.Log;
 import android.view.Surface;
 import android.view.ViewGroup;
@@ -37,6 +36,9 @@ public final class TriAevumActivity extends Activity {
 
     // JNI Native bindings
     public static native void nativeSetStoragePath(String path);
+    public static native void nativePrepareSession();
+    public static native void nativeRequestShutdown();
+    public static native void nativeShutdownIdleHost();
     public static native void nativeSurfaceCreated(Surface surface);
     public static native void nativeSurfaceChanged(Surface surface, int width, int height);
     public static native void nativeSurfaceDestroyed();
@@ -145,9 +147,20 @@ public final class TriAevumActivity extends Activity {
 
     private synchronized void ensureGameStarted() {
         if (mGameStarted) return;
-        mGameStarted = true;
 
         File root = getExternalFilesDir(null);
+        if (root == null) {
+            Log.e(TAG, "App-specific external storage is unavailable; native game was not started");
+            return;
+        }
+        if (!root.isDirectory() && !root.mkdirs()) {
+            Log.e(TAG, "Could not create app-specific game storage: " + root);
+            return;
+        }
+
+        nativeSetStoragePath(root.getAbsolutePath());
+        nativePrepareSession();
+        mGameStarted = true;
         final String[] args = new String[] {
             "TriAevum",
             "--launch-profile", new File(root, "TriAevum.android.launch.json").getAbsolutePath(),
@@ -169,7 +182,12 @@ public final class TriAevumActivity extends Activity {
 
     private int resolveMaximumShortEdge() {
         int maximumShortEdge = 720;
-        File config = new File(getExternalFilesDir(null), "TriAevum.android.host.json");
+        File storageRoot = getExternalFilesDir(null);
+        if (storageRoot == null) {
+            Log.w(TAG, "App-specific external storage unavailable; using default surface extent");
+            return maximumShortEdge;
+        }
+        File config = new File(storageRoot, "TriAevum.android.host.json");
         if (config.isFile()) {
             try {
                 maximumShortEdge = new JSONObject(new String(Files.readAllBytes(config.toPath()), StandardCharsets.UTF_8))
@@ -414,9 +432,34 @@ public final class TriAevumActivity extends Activity {
 
     @Override
     protected void onDestroy() {
+        if (mWindroidOverlay != null) {
+            mWindroidOverlay.releaseAll();
+        } else if (mInputTarget != null) {
+            mInputTarget.releaseAll();
+        }
+
+        Thread gameThread = mGameThread;
+        if (gameThread != null && gameThread.isAlive()) {
+            // Stop the normal game loop and wait for renderer/context destruction
+            // on the owning thread; never kill the process with GPU work in flight.
+            nativeRequestShutdown();
+            boolean interrupted = false;
+            while (gameThread.isAlive()) {
+                try {
+                    gameThread.join();
+                } catch (InterruptedException error) {
+                    interrupted = true;
+                    Log.w(TAG, "Interrupted while waiting for native shutdown; continuing to wait for safe teardown");
+                }
+            }
+            if (interrupted) {
+                Thread.currentThread().interrupt();
+            }
+        } else {
+            // A window can be created before startup fails (for example when
+            // app-specific storage is unavailable); release its native refs too.
+            nativeShutdownIdleHost();
+        }
         super.onDestroy();
-        // Clean process termination to prevent dirty static globals from persisting
-        // across consecutive app launches on Android Bionic.
-        Process.killProcess(Process.myPid());
     }
 }

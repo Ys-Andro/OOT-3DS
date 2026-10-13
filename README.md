@@ -1,134 +1,69 @@
-# TriAevum
+# OOT-3DS-ANDROID
 
-A native PC AOT recompilation of *The Legend of Zelda: Ocarina of Time 3D*,
-with a modern NRI/Vulkan renderer, single-screen UI and customizable graphics.
+Android-focused ARM64 port of the TriAevum AOT recompilation of *The Legend of Zelda: Ocarina of Time 3D*.
 
-## Credit Where It Belongs
+This repository is intended to become an Android-first project. The shared AOT title/runtime and PICA rendering code are retained where the Android port depends on them; desktop packaging and desktop-only front ends are not part of the Android product.
 
-Before the shaders, settings and excessive grass: **TriAevum would not exist in
-its current form without [TopScreen](https://gamebanana.com/mods/695893),
-developed by rlgcarrot**. Its single-screen experience is reimplemented here for
-our runtime, but the vision, care and tremendous work behind it deserve a
-special thank-you. Please consider [buying rlgcarrot a coffee](https://ko-fi.com/rlgcarrot)
-to support that fantastic work.
+## Current status
 
-Just as essential are **Azahar, Ship of Harkinian, libultraship, NVIDIA NRI**,
-and the SDL controller-mapping community. And, of course, **Nintendo and
-Grezzo**, who created the original game. [Full credits and licenses](THIRD_PARTY_NOTICES.md).
+**Experimental developer foundation — not a stable or fully playable release.**
 
-**[Download v0.6.0-alpha.2c: Windows portable and Linux Flatpak](https://github.com/coccofresco/TriAevum/releases/tag/v0.6.0-alpha.2c)**
+The current Android implementation has a Gradle application module, an Android controls library, and a native ARM64 build path. The native foundation currently targets **Vulkan/NRI**, not OpenGL ES. Existing documentation reports limited intro bring-up on an Adreno 830; this is not evidence of full gameplay, reliable input, or compatibility with other GPUs.
 
-## About
+The following remain separate milestones and must not be represented as complete merely because a library links:
 
-TriAevum is an AOT recomp in the same general spirit as the Xbox 360 recomp
-projects. I just ended up spending most of my time on the renderer instead of,
-you know, actually playing the game. The goal is to push the visuals further
-without completely losing the original look.
+- playable boot and gameplay on a physical Android device;
+- Android lifecycle and surface recreation under pause/resume;
+- touch/controller integration and single-screen TopScreen coordinate mapping;
+- user-owned game-data import through Android's document picker, without bundling game data;
+- save persistence, audio-device handling, and graceful error reporting;
+- performance and frame-pacing validation on the target GPU;
+- any OpenGL ES backend or Vulkan-to-OpenGL migration.
 
-**Development of this project is entirely AI-assisted, under human direction.**
-That describes the TriAevum-specific work, not the mature donor projects and
-libraries it builds on: Azahar, Ship of Harkinian, NRI and others. Aside from
-those foundations, you could fairly call this concentrated AI slop.
-Apparently, even AI slop can still consume several months of your life.
+## Android development
 
-## Install
+See [Android native foundation](ports/android/README.md) for the qualified toolchain, native build scripts, and current limitations. For the product/dependency audit and Android acceptance gate, see [Android product audit](docs/ANDROID_PRODUCT_AUDIT.md).
 
-Requires Windows or Linux x64, a Vulkan-capable GPU with current drivers, and your own
-supported decrypted ROM. Forge accepts `.3ds` and `.cci` and checks the contents,
-not just the filename.
+The native build and the APK packaging step are intentionally separate. `scripts/build-android-native.sh` builds native components; it explicitly does **not** produce a playable APK. The app's Gradle configuration requires a staged set of ARM64 shared libraries.
 
-It should work with any personal EUR or USA ROM dump, provided it is decrypted
-and in `.cci` or `.3ds` format.
-See [ROM compatibility details](docs/TRIAEVUM_CONTENT_FAMILY_IMPORT.md).
+Build the native foundation on Linux with the Android NDK as described in the Android documentation. Do not infer that the APK is playable from a successful CMake or Gradle build alone.
 
-### Windows
+## Android-only project policy
 
-1. Download the **Windows-x64 ZIP**, not GitHub's source-code archive, and
-   extract it into a writable folder.
-2. Run `TriAevumForge.exe` and select your decrypted ROM.
-3. When setup finishes, choose **Launch game**. Afterwards, use `TriAevum.exe`.
+1. **Android is the product target.** New user-facing features, packaging, input, storage, audio, lifecycle, and graphics integration must be designed for Android.
+2. **Retain shared engine code.** Do not delete AOT translation, runtime, PICA renderer, plugin loader, or native probes just because they originated in desktop builds. First prove they are not required by the Android target.
+3. **Remove desktop-only product surface incrementally.** Windows/Linux installers, desktop GUI code, and desktop release workflows may be removed from the Android product path only after checking all references, build targets, scripts, and licensing obligations. Development tools required to generate or validate Android inputs may remain.
+4. **No fake backend switch.** Disabling Vulkan is not an OpenGL ES implementation. A GLES backend requires a real implementation of the renderer's resource, shader, synchronization, and presentation contracts.
+5. **Preserve TopScreen.** The Android presentation must use a single gameplay surface and transform input coordinates consistently with scaling and letterboxing. Do not change guest/game logic to implement host UI behavior.
+6. **Keep simulation timing deterministic.** Frame interpolation belongs to presentation; it must not advance gameplay state, collision, or input more than the original simulation expects.
+7. **No copyrighted game data in Git or APKs.** Do not add ROMs, extracted Nintendo assets, proprietary shaders/textures, or generated game-data packages. Any supported import workflow must use data supplied by the user and must respect applicable law.
+8. **Preserve license and provenance.** Keep GPL-3.0-or-later notices and all third-party licenses, copyright headers, and provenance records for retained components.
 
-### Linux and Steam Deck
+## Architecture direction
 
-1. Install the **Linux-x86_64.flatpak** using your software manager or
-   `flatpak install --user ./TriAevum-v0.6.0-alpha.2c-Linux-x86_64.flatpak`.
-2. Open **TriAevum** and select your decrypted ROM in Forge.
-3. Choose **Launch game** when preparation finishes.
+The intended platform boundary is:
 
-On Steam Deck, prepare the game in Desktop Mode before adding TriAevum to Steam.
-The same Flatpak targets Linux desktops and Steam Deck; physical Steam Deck and
-Gaming Mode testing have not yet been performed.
+- **Shared native core:** AOT title, runtime services, PICA semantics, input ABI, save/state logic.
+- **Android host:** Activity/lifecycle, native surface, document picker/import, app-private storage, audio focus/device binding, Android input and error presentation.
+- **Renderer backend:** explicit backend interface; Vulkan/NRI remains the current implementation until a GLES implementation is complete and tested.
+- **Presentation:** one TopScreen viewport, device-aware scaling/letterboxing, optional frame interpolation with independent simulation and presentation clocks.
 
-No compiler or SDK is needed. Forge downloads the official TopScreen texture
-package during setup; an Internet connection is required unless that package
-is [provided locally](docs/TRIAEVUM_TOPSCREEN_INSTALLATION.md). No ROM or original
-game assets are included. Forge also prepares the bundled shaders for your GPU
-automatically; shaders encountered later are cached while playing.
-Back up your saves, settings and prepared data: `data/` beside the Windows
-application, or `~/.var/app/io.github.coccofresco.TriAevum/` on Linux.
+Do not introduce a second game/runtime implementation in Kotlin. Kotlin should own Android UI and platform APIs; C/C++ should own the native engine and renderer.
 
-## Graphics and controls
+## Validation requirements
 
-- Cel/toon shading and outlines.
-- Ambient occlusion, plus optional reflections, shadows and anti-aliasing.
-- Real widescreen framing and configurable field of view.
-- **60/90 FPS visual interpolation** of the original 30 Hz game state.
-  Game logic and gameplay speed remain unchanged; this is not 60/90 Hz physics.
-- Azahar-compatible custom textures and texture dumping.
-- Reimplemented **TopScreen** single-screen HUD and menus.
-- Configurable gameplay free camera, keyboard/mouse and controller inputs.
-- Named settings profiles, audio and save states.
-- Procedural grass. A lot of grass. Possibly too much grass.
+Before calling a change complete:
 
-Press **F1** for settings. **F2** temporarily disables the main added graphics
-effects, then restores them without losing your configuration. Most of the
-presentation is configurable, so if my artistic decisions offend you
-personally, you can probably undo them. Effects can be expensive; adjust them
-to suit your GPU.
+- run the relevant native unit tests and source-manifest checks;
+- build the Android ARM64 targets with the documented NDK/CMake/Ninja versions;
+- build/package the APK with the staged native libraries;
+- test launch, pause/resume, surface recreation, touch cancellation, controller disconnect, import failure, save/reload, and shutdown;
+- record device model, Android version, GPU/driver, renderer backend, resolution, simulation rate, presented FPS, and logs for performance claims.
 
-## Testing and contributing
+A passing host test or successful link is useful evidence, but is not a substitute for on-device validation.
 
-This is an **experimental alpha**, not a fully tested port. Gameplay testing
-currently covers the early parts of the game. The USA adapter has been checked
-through installation, the title intro and file selection, not a full playthrough.
-I find tweaking shaders considerably more entertaining than finishing Zelda
-again, so people willing to actually play through it are especially welcome.
+## Credits and licenses
 
-Please [report issues](https://github.com/coccofresco/TriAevum/issues) with the
-version, ROM input/revision, GPU/driver, settings and steps to reproduce.
-**Normal in-game save files are particularly useful for problems later in the
-game.** Review logs for personal information before sharing; do not upload
-ROMs, extracted assets or memory savestates containing game code.
+This project derives from [TriAevum](https://github.com/coccofresco/TriAevum) and retains components from libultraship, Azahar, NVIDIA NRI, and other upstream projects. See [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md), [LICENSE_SCOPE.md](LICENSE_SCOPE.md), and the license files in each imported component. Preserve all attribution and license requirements when modifying or removing code.
 
-Contributions, experiments and forks taking the renderer in other directions
-are welcome. [Community contributors and PR credits](docs/TRIAEVUM_CONTRIBUTIONS.md)
-are recorded separately from the original AI-assisted development. Longer term,
-I would like to explore a proper ray-tracing path
-and finish features still in the traditional state known as "technically
-implemented". Ray tracing is a wishlist item, not a feature of this release.
-
-[Release notes and known limitations](docs/releases/v0.6.0-alpha.2b.md).
-
-## Screenshots
-
-Captured directly from the alpha.2 framebuffer on Windows and Linux with the
-default profile: toon shading, outlines, grass, 1.10x FOV, x2 interpolation and
-TopScreen. No additional HD texture pack.
-
-![Windows: Kokiri Forest outside Link's house, with the TopScreen HUD](docs/images/alpha2-kokiri.png)
-
-![Windows: Link and Epona in the title intro](docs/images/alpha2-title.png)
-
-![Linux Flatpak: mounted gameplay with the TopScreen HUD](docs/images/alpha2-mounted-linux.png)
-
-## Source and license
-
-Original contributions are licensed under **GPL-3.0-or-later**. Third-party
-components retain their own licenses and notices:
-[license scope](LICENSE_SCOPE.md) and [third-party notices](THIRD_PARTY_NOTICES.md).
-See the [release and build contract](docs/TRIAEVUM_PRECOMPILED_RELEASE.md) for
-source availability and developer packaging.
-
-TriAevum is independent and is not affiliated with or endorsed by Nintendo.
-
-Worst case scenario, at least we got more grass.
+This is an independent community project and is not affiliated with or endorsed by Nintendo.
