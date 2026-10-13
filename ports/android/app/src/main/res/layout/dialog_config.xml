@@ -549,7 +549,7 @@
                         <TextView android:layout_width="match_parent" android:layout_height="wrap_content"
                             android:text="Proporción del área de juego" android:textColor="#C8D8E8" android:textSize="12sp" />
                         <Spinner android:id="@+id/sp_aspect_ratio" android:layout_width="match_parent"
-                            android:layout_height="wrap_content" android:entries="@array/display_aspect_ratio_labels"
+                            android:layout_height="wrap_content"
                             android:layout_marginBottom="4dp" />
                         <TextView android:id="@+id/tv_display_size_label" android:layout_width="wrap_content"
                             android:layout_height="wrap_content" android:text="Tamaño del área de juego: 100%"
