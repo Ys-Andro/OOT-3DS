@@ -46,6 +46,7 @@ public class TriAevumDownloadActivity extends Activity {
 
     private static final String TAG = "TriAevumDownloader";
     private static final int REQUEST_CODE_PICK_ROM_DIR = 1001;
+    private static final int REQUEST_CODE_PICK_SAVE_DIR = 1002;
     private static final String PREFS_NAME = "org.triaevum.android_preferences";
     private static final String PREF_ROM_DIR_URI = "selected_rom_directory_uri";
 
@@ -56,6 +57,7 @@ public class TriAevumDownloadActivity extends Activity {
     private ProgressBar mPbDownload;
     private Button mBtnAction;
     private Button mBtnChangeDirectory;
+    private Button mBtnImportSave;
     private View mLayoutProgressDetails;
     private View mRootLayout;
 
@@ -97,6 +99,7 @@ public class TriAevumDownloadActivity extends Activity {
         mPbDownload            = findViewById(R.id.pb_download);
         mBtnAction             = findViewById(R.id.btn_download_action);
         mBtnChangeDirectory    = findViewById(R.id.btn_change_directory);
+        mBtnImportSave         = findViewById(R.id.btn_import_citra_save);
         mLayoutProgressDetails = findViewById(R.id.layout_progress_details);
 
         mRootLayout.setOnClickListener(v -> {
@@ -117,6 +120,8 @@ public class TriAevumDownloadActivity extends Activity {
             mBtnAction.setOnClickListener(v -> launchGame());
             mBtnChangeDirectory.setVisibility(View.VISIBLE);
             mBtnChangeDirectory.setOnClickListener(v -> pickRomDirectory());
+            mBtnImportSave.setVisibility(View.VISIBLE);
+            mBtnImportSave.setOnClickListener(v -> pickCitraSaveDirectory());
             mTvStatus.setText("La ROM está lista. Toca en «Iniciar juego» o «Cambiar carpeta».");
             mTvTouchToStart.setVisibility(View.VISIBLE);
             AlphaAnimation pulse = new AlphaAnimation(0.25f, 1.0f);
@@ -129,6 +134,7 @@ public class TriAevumDownloadActivity extends Activity {
             mTvStatus.setText("Selecciona la carpeta que contiene los archivos de la ROM para comenzar");
             mBtnAction.setOnClickListener(v -> requestStoragePermissionAndPickRomDirectory());
             mBtnChangeDirectory.setVisibility(View.GONE);
+            mBtnImportSave.setVisibility(View.GONE);
             mTvTouchToStart.setVisibility(View.GONE);
         }
     }
@@ -152,6 +158,10 @@ public class TriAevumDownloadActivity extends Activity {
         if (mBtnChangeDirectory != null) {
             mBtnChangeDirectory.setVisibility(View.VISIBLE);
             mBtnChangeDirectory.setOnClickListener(v -> pickRomDirectory());
+        }
+        if (mBtnImportSave != null) {
+            mBtnImportSave.setVisibility(View.VISIBLE);
+            mBtnImportSave.setOnClickListener(v -> pickCitraSaveDirectory());
         }
         mTvTouchToStart.setVisibility(View.VISIBLE);
         AlphaAnimation pulse = new AlphaAnimation(0.25f, 1.0f);
@@ -214,9 +224,184 @@ public class TriAevumDownloadActivity extends Activity {
         startActivityForResult(intent, REQUEST_CODE_PICK_ROM_DIR);
     }
 
+    private void pickCitraSaveDirectory() {
+        if (!mReadyToStart || mIsDownloading) {
+            android.widget.Toast.makeText(this, "Espera a que termine la preparación del juego.", android.widget.Toast.LENGTH_SHORT).show();
+            return;
+        }
+        Intent intent = new Intent(Intent.ACTION_OPEN_DOCUMENT_TREE);
+        intent.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION |
+                        Intent.FLAG_GRANT_PERSISTABLE_URI_PERMISSION |
+                        Intent.FLAG_GRANT_PREFIX_URI_PERMISSION);
+        startActivityForResult(intent, REQUEST_CODE_PICK_SAVE_DIR);
+    }
+
+    private void importCitraSave(Uri treeUri) {
+        if (mIsDownloading) return;
+        mIsDownloading = true;
+        mMainHandler.post(() -> {
+            mTvStatus.setText("Importando partida de Citra…");
+            mTvDetails.setText("Copiando los archivos de la partida…");
+            mPbDownload.setIndeterminate(true);
+            mLayoutProgressDetails.setVisibility(View.VISIBLE);
+            mBtnAction.setEnabled(false);
+            mBtnChangeDirectory.setEnabled(false);
+            mBtnImportSave.setEnabled(false);
+        });
+
+        mExecutor.execute(() -> {
+            File root = getExternalFilesDir(null);
+            if (root == null) {
+                finishSaveImportUi("No se pudo acceder al almacenamiento de la aplicación.", false);
+                return;
+            }
+            File saveDir = new File(root, "savedata");
+            File stagingDir = new File(root, "citra_import_staging_" + System.currentTimeMillis());
+            try {
+                DocumentFile picked = DocumentFile.fromTreeUri(this, treeUri);
+                if (picked == null || !picked.exists() || !picked.isDirectory()) {
+                    throw new IOException("La carpeta seleccionada no es accesible.");
+                }
+                if (!stagingDir.mkdirs()) throw new IOException("No se pudo preparar la importación.");
+                int saveCount = 0;
+                boolean hasSystem = false;
+                DocumentFile[] entries = picked.listFiles();
+                if (entries == null) throw new IOException("No se pudo leer el contenido de la carpeta.");
+
+                for (DocumentFile entry : entries) {
+                    if (!entry.isFile() || entry.getName() == null) continue;
+                    String name = entry.getName();
+                    boolean saveFile = name.matches("(?i)save[0-9]+\\.bin");
+                    boolean systemFile = "system.dat".equalsIgnoreCase(name);
+                    if (!saveFile && !systemFile) continue;
+                    long size = entry.length();
+                    if (size <= 0 || size > 1024 * 1024) {
+                        throw new IOException("Tamaño no válido para " + name + " (" + size + " bytes).");
+                    }
+                    String normalizedName = systemFile ? "system.dat" : name.toLowerCase(Locale.ROOT);
+                    File staged = new File(stagingDir, normalizedName);
+                    try (InputStream in = getContentResolver().openInputStream(entry.getUri());
+                         OutputStream out = new FileOutputStream(staged)) {
+                        if (in == null) throw new IOException("No se pudo leer " + name);
+                        byte[] buffer = new byte[8192];
+                        int count;
+                        while ((count = in.read(buffer)) != -1) out.write(buffer, 0, count);
+                    }
+                    if (staged.length() != size) {
+                        throw new IOException("La copia de " + name + " quedó incompleta.");
+                    }
+                    if (saveFile) saveCount++;
+                    if (systemFile) hasSystem = true;
+                }
+
+                if (saveCount == 0) {
+                    throw new IOException("No encontré save00.bin (u otro saveNN.bin). Elige la carpeta donde se ven directamente esos archivos.");
+                }
+                if (!saveDir.exists() && !saveDir.mkdirs()) {
+                    throw new IOException("No se pudo crear la carpeta de partidas.");
+                }
+
+                File[] stagedFiles = stagingDir.listFiles();
+                if (stagedFiles == null || stagedFiles.length == 0) {
+                    throw new IOException("No hay archivos de partida válidos para importar.");
+                }
+                boolean needsBackup = false;
+                for (File staged : stagedFiles) {
+                    if (new File(saveDir, staged.getName()).exists()) needsBackup = true;
+                }
+                File backupDir = new File(saveDir, "backup_citra_import_" + System.currentTimeMillis());
+                if (needsBackup && !backupDir.mkdirs()) {
+                    throw new IOException("No se pudo crear la copia de seguridad de la partida actual.");
+                }
+
+                // Respaldar todo lo que vaya a ser reemplazado antes de modificar la partida.
+                for (File staged : stagedFiles) {
+                    File destination = new File(saveDir, staged.getName());
+                    if (destination.exists()) copyLocalFile(destination, new File(backupDir, destination.getName()));
+                }
+                // Instalar únicamente saveNN.bin y system.dat; los demás datos quedan intactos.
+                for (File staged : stagedFiles) {
+                    File destination = new File(saveDir, staged.getName());
+                    File temp = new File(saveDir, staged.getName() + ".importing");
+                    copyLocalFile(staged, temp);
+                    if (destination.exists() && !destination.delete()) {
+                        throw new IOException("No se pudo reemplazar " + destination.getName());
+                    }
+                    if (!temp.renameTo(destination)) {
+                        throw new IOException("No se pudo instalar " + destination.getName());
+                    }
+                }
+
+                final int importedSaves = saveCount;
+                final boolean importedSystem = hasSystem;
+                final String backupMessage = needsBackup ? " Se guardó una copia de seguridad." : "";
+                finishSaveImportUi("Partida importada: " + importedSaves + " archivo(s) save*.bin"
+                    + (importedSystem ? " y system.dat." : ". system.dat no estaba en la carpeta.")
+                    + backupMessage + " Inicia el juego para comprobar la compatibilidad.", true);
+            } catch (Exception e) {
+                Log.e(TAG, "Error al importar la partida de Citra", e);
+                finishSaveImportUi("No se importó la partida: " + e.getMessage(), false);
+            } finally {
+                deleteRecursively(stagingDir);
+            }
+        });
+    }
+
+    private void finishSaveImportUi(String message, boolean success) {
+        mIsDownloading = false;
+        mMainHandler.post(() -> {
+            mTvStatus.setText(message);
+            mTvDetails.setText(success
+                ? "Reinicia el juego si ya estaba abierto."
+                : "Elige la carpeta que contiene directamente save00.bin.");
+            mPbDownload.setIndeterminate(false);
+            mPbDownload.setProgress(success ? 100 : 0);
+            mTvPercent.setText(success ? "100%" : "");
+            mLayoutProgressDetails.setVisibility(View.VISIBLE);
+            mBtnAction.setEnabled(true);
+            mBtnChangeDirectory.setEnabled(true);
+            mBtnImportSave.setEnabled(true);
+        });
+    }
+
+    private static void copyLocalFile(File source, File destination) throws IOException {
+        File parent = destination.getParentFile();
+        if (parent != null && !parent.exists() && !parent.mkdirs()) {
+            throw new IOException("No se pudo crear " + parent.getName());
+        }
+        try (InputStream in = new FileInputStream(source);
+             OutputStream out = new FileOutputStream(destination)) {
+            byte[] buffer = new byte[8192];
+            int count;
+            while ((count = in.read(buffer)) != -1) out.write(buffer, 0, count);
+            out.flush();
+        }
+    }
+
+    private static void deleteRecursively(File file) {
+        if (file == null || !file.exists()) return;
+        File[] children = file.listFiles();
+        if (children != null) for (File child : children) deleteRecursively(child);
+        file.delete();
+    }
+
+
     @Override
     protected void onActivityResult(int requestCode, int resultCode, Intent data) {
         super.onActivityResult(requestCode, resultCode, data);
+        if (requestCode == REQUEST_CODE_PICK_SAVE_DIR && resultCode == RESULT_OK && data != null) {
+            Uri saveUri = data.getData();
+            if (saveUri != null) {
+                try {
+                    getContentResolver().takePersistableUriPermission(saveUri,
+                        Intent.FLAG_GRANT_READ_URI_PERMISSION);
+                } catch (Exception e) {
+                    Log.w(TAG, "No se pudo conservar el permiso de lectura de la partida", e);
+                }
+                importCitraSave(saveUri);
+            }
+            return;
+        }
         if (requestCode == REQUEST_CODE_PICK_ROM_DIR && resultCode == RESULT_OK && data != null) {
             Uri uri = data.getData();
             if (uri != null) {
