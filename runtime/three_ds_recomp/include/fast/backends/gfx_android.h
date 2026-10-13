@@ -61,6 +61,9 @@ class GfxWindowBackendAndroid final : public GfxWindowBackend {
     static ANativeWindow* GetGlobalNativeWindow();
     static void SetGlobalDimensions(uint32_t width, uint32_t height);
     static void SignalStop();
+    static void ResetStop();
+    // Call only after the native game loop and renderer have fully stopped.
+    static void ReleaseNativeWindowsAfterRuntimeStopped();
     static bool IsSurfaceAvailable();
 
   private:
