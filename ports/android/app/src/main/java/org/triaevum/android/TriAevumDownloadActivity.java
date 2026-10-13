@@ -113,11 +113,11 @@ public class TriAevumDownloadActivity extends Activity {
 
         if (isGameInstalled(this)) {
             mReadyToStart = true;
-            mBtnAction.setText("Iniciar Jogo");
+            mBtnAction.setText("Iniciar juego");
             mBtnAction.setOnClickListener(v -> launchGame());
             mBtnChangeDirectory.setVisibility(View.VISIBLE);
             mBtnChangeDirectory.setOnClickListener(v -> pickRomDirectory());
-            mTvStatus.setText("ROM pronta. Toque em 'Iniciar Jogo' ou 'Trocar Pasta'.");
+            mTvStatus.setText("La ROM está lista. Toca en «Iniciar juego» o «Cambiar carpeta».");
             mTvTouchToStart.setVisibility(View.VISIBLE);
             AlphaAnimation pulse = new AlphaAnimation(0.25f, 1.0f);
             pulse.setDuration(600);
@@ -125,8 +125,8 @@ public class TriAevumDownloadActivity extends Activity {
             pulse.setRepeatCount(Animation.INFINITE);
             mTvTouchToStart.startAnimation(pulse);
         } else {
-            mBtnAction.setText("Selecionar Pasta da ROM");
-            mTvStatus.setText("Selecione o diretório onde estão os arquivos da ROM para começar");
+            mBtnAction.setText("Seleccionar carpeta de la ROM");
+            mTvStatus.setText("Selecciona la carpeta que contiene los archivos de la ROM para comenzar");
             mBtnAction.setOnClickListener(v -> requestStoragePermissionAndPickRomDirectory());
             mBtnChangeDirectory.setVisibility(View.GONE);
             mTvTouchToStart.setVisibility(View.GONE);
@@ -142,12 +142,12 @@ public class TriAevumDownloadActivity extends Activity {
         }
         mReadyToStart = true;
         mIsDownloading = false;
-        mTvStatus.setText("ROM pronta para jogar!");
+        mTvStatus.setText("¡La ROM está lista para jugar!");
         mPbDownload.setProgress(100);
         mTvPercent.setText("100%");
         mLayoutProgressDetails.setVisibility(View.GONE);
         mBtnAction.setVisibility(View.VISIBLE);
-        mBtnAction.setText("Iniciar Jogo");
+        mBtnAction.setText("Iniciar juego");
         mBtnAction.setOnClickListener(v -> launchGame());
         if (mBtnChangeDirectory != null) {
             mBtnChangeDirectory.setVisibility(View.VISIBLE);
@@ -184,9 +184,9 @@ public class TriAevumDownloadActivity extends Activity {
         if (!isGameInstalled(this)) {
             mReadyToStart = false;
             mMainHandler.post(() -> {
-                mTvStatus.setText("Arquivos do jogo não encontrados. Selecione a pasta da ROM novamente.");
+                mTvStatus.setText("No se encontraron los archivos del juego. Selecciona de nuevo la carpeta de la ROM.");
                 mBtnAction.setVisibility(View.VISIBLE);
-                mBtnAction.setText("Selecionar Pasta da ROM");
+                mBtnAction.setText("Seleccionar carpeta de la ROM");
                 mBtnAction.setOnClickListener(v -> requestStoragePermissionAndPickRomDirectory());
                 if (mBtnChangeDirectory != null) mBtnChangeDirectory.setVisibility(View.GONE);
                 mTvTouchToStart.setVisibility(View.GONE);
@@ -224,7 +224,7 @@ public class TriAevumDownloadActivity extends Activity {
                     getContentResolver().takePersistableUriPermission(uri,
                         Intent.FLAG_GRANT_READ_URI_PERMISSION);
                 } catch (Exception e) {
-                    Log.w(TAG, "Falha ao obter permissão persistente para a pasta", e);
+                    Log.w(TAG, "No se pudo conservar el permiso de acceso a la carpeta", e);
                 }
 
                 // Salvar o diretório selecionado nas SharedPreferences
@@ -312,16 +312,16 @@ public class TriAevumDownloadActivity extends Activity {
             mBtnAction.setVisibility(View.GONE);
             mTvTouchToStart.setVisibility(View.GONE);
             mLayoutProgressDetails.setVisibility(View.VISIBLE);
-            mTvStatus.setText("Procurando arquivos da ROM no diretório...");
+            mTvStatus.setText("Buscando archivos de la ROM en la carpeta...");
             mPbDownload.setIndeterminate(true);
             mTvPercent.setText("");
-            mTvDetails.setText("Examinando pasta selecionada...");
+            mTvDetails.setText("Examinando la carpeta seleccionada...");
         });
 
         mExecutor.execute(() -> {
             File targetDir = getExternalFilesDir(null);
             if (targetDir == null) {
-                showError("Armazenamento externo indisponível");
+                showError("El almacenamiento externo no está disponible");
                 return;
             }
             if (!targetDir.exists()) targetDir.mkdirs();
@@ -329,14 +329,14 @@ public class TriAevumDownloadActivity extends Activity {
             try {
                 DocumentFile pickedDir = DocumentFile.fromTreeUri(this, treeUri);
                 if (pickedDir == null || !pickedDir.exists() || !pickedDir.isDirectory()) {
-                    showError("Pasta selecionada não encontrada ou inacessível.");
+                    showError("La carpeta seleccionada no existe o no es accesible.");
                     return;
                 }
 
                 RomDiscoveryResult result = discoverRomFiles(pickedDir);
 
                 if (!result.hasAnyGameData()) {
-                    showError("Nenhum arquivo da ROM (.3ds, .cci ou code.bin/romfs.bin) encontrado no diretório selecionado.");
+                    showError("No se encontraron archivos de ROM (.3ds, .cci o code.bin/romfs.bin) en la carpeta seleccionada.");
                     return;
                 }
 
@@ -347,19 +347,19 @@ public class TriAevumDownloadActivity extends Activity {
                 }
 
             } catch (Exception e) {
-                Log.e(TAG, "Erro ao processar diretório da ROM", e);
-                showError("Erro ao processar ROM: " + e.getMessage());
+                Log.e(TAG, "Error al procesar la carpeta de la ROM", e);
+                showError("Error al procesar la ROM: " + e.getMessage());
             }
         });
     }
 
     private void processExtractedRomFiles(RomDiscoveryResult result, File targetDir) throws Exception {
         mMainHandler.post(() -> {
-            mTvStatus.setText("Arquivos da ROM encontrados! Preparando jogo...");
+            mTvStatus.setText("¡Archivos de la ROM encontrados! Preparando el juego...");
             mPbDownload.setIndeterminate(false);
             mPbDownload.setProgress(0);
             mTvPercent.setText("0%");
-            mTvDetails.setText("Copiando arquivos necessários...");
+            mTvDetails.setText("Copiando archivos necesarios...");
         });
 
         long totalBytes = result.codeBin.length() + result.romfsBin.length();
@@ -379,14 +379,14 @@ public class TriAevumDownloadActivity extends Activity {
             byte[] codeBytes = Files.readAllBytes(destCode.toPath());
             String codeSha = CtrRomExtractor.sha256Hex(codeBytes);
             if ("ef210566e1d9d16879a746dfb063fcbad232f0171d860de906531ecc526cc020".equalsIgnoreCase(codeSha)) {
-                mMainHandler.post(() -> mTvDetails.setText("Adaptando executável regional..."));
+                mMainHandler.post(() -> mTvDetails.setText("Adaptando el ejecutable regional..."));
                 codeBytes = CtrRomExtractor.adaptUsaCodeToEur(this, codeBytes);
                 try (FileOutputStream fos = new FileOutputStream(destCode)) {
                     fos.write(codeBytes);
                 }
             }
         } catch (Exception e) {
-            Log.w(TAG, "Aviso ao verificar hash do code.bin", e);
+            Log.w(TAG, "Aviso al verificar el hash de code.bin", e);
         }
 
         // 2. Copiar exheader.bin se presente
@@ -403,7 +403,7 @@ public class TriAevumDownloadActivity extends Activity {
         try {
             CtrRomExtractor.normalizeRomFsIfNeeded(destRomfs);
         } catch (Exception e) {
-            Log.w(TAG, "Aviso ao normalizar RomFS", e);
+            Log.w(TAG, "Aviso al normalizar RomFS", e);
         }
 
         // 4. Descompactar bundled assets (launch config, overrides, manifest)
@@ -422,7 +422,7 @@ public class TriAevumDownloadActivity extends Activity {
             mPbDownload.setIndeterminate(false);
             mPbDownload.setProgress(0);
             mTvPercent.setText("0%");
-            mTvDetails.setText("Copiando arquivo de ROM para processamento...");
+            mTvDetails.setText("Copiando el archivo de ROM para procesarlo...");
         });
 
         long romLength = romContainerFile.length();
@@ -435,7 +435,7 @@ public class TriAevumDownloadActivity extends Activity {
                 mTvStatus.setText(stage);
                 mPbDownload.setProgress(percent);
                 mTvPercent.setText(percent + "%");
-                mTvDetails.setText("Extraindo e convertendo ROM...");
+                mTvDetails.setText("Extrayendo y convirtiendo la ROM...");
             });
         });
 
@@ -485,9 +485,9 @@ public class TriAevumDownloadActivity extends Activity {
             mPbDownload.setIndeterminate(false);
             mPbDownload.setProgress(0);
             mTvPercent.setText("");
-            mTvDetails.setText("Toque no botão abaixo para selecionar a pasta com os arquivos da ROM.");
+            mTvDetails.setText("Pulsa el botón de abajo para seleccionar la carpeta con los archivos de la ROM.");
             mBtnAction.setVisibility(View.VISIBLE);
-            mBtnAction.setText("Selecionar Pasta da ROM");
+            mBtnAction.setText("Seleccionar carpeta de la ROM");
             mBtnAction.setOnClickListener(v -> requestStoragePermissionAndPickRomDirectory());
             if (mBtnChangeDirectory != null) mBtnChangeDirectory.setVisibility(View.GONE);
         });
