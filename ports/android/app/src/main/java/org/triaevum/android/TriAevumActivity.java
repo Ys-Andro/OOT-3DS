@@ -94,8 +94,8 @@ public final class TriAevumActivity extends Activity {
         // Create native Vulkan surface view
         int maximumShortEdge = resolveMaximumShortEdge();
         mSurface = new TriAevumSurface(this, maximumShortEdge);
-        mLayout.addView(mSurface, new FrameLayout.LayoutParams(
-            ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT));
+        FrameLayout.LayoutParams surfaceParams = resolveDisplayLayoutParams();
+        mLayout.addView(mSurface, surfaceParams);
 
         // Create and bind virtual controller overlay
         try {
@@ -178,6 +178,45 @@ public final class TriAevumActivity extends Activity {
             Log.i(TAG, "Native game loop exited");
         }, "TriAevumGameThread");
         mGameThread.start();
+    }
+
+    private FrameLayout.LayoutParams resolveDisplayLayoutParams() {
+        android.content.SharedPreferences prefs = getApplicationContext()
+            .getSharedPreferences("org.triaevum.android_preferences", Context.MODE_PRIVATE);
+        String ratio = prefs.getString("TriAevum_DisplayAspectRatio", "full");
+        int sizePercent = Math.max(50, Math.min(100,
+            prefs.getInt("TriAevum_DisplaySizePercent", 100)));
+        android.util.DisplayMetrics metrics = getResources().getDisplayMetrics();
+        int screenWidth = metrics.widthPixels;
+        int screenHeight = metrics.heightPixels;
+        if (screenWidth <= 0 || screenHeight <= 0) {
+            return new FrameLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT);
+        }
+
+        int width = screenWidth;
+        int height = screenHeight;
+        float targetRatio = 0F;
+        if ("4:3".equals(ratio)) targetRatio = 4F / 3F;
+        else if ("16:9".equals(ratio)) targetRatio = 16F / 9F;
+        else if ("18:9".equals(ratio)) targetRatio = 2F;
+        else if ("20:9".equals(ratio)) targetRatio = 20F / 9F;
+
+        if (targetRatio > 0F) {
+            float screenRatio = (float) screenWidth / (float) screenHeight;
+            if (screenRatio > targetRatio) {
+                width = Math.round(screenHeight * targetRatio);
+            } else {
+                height = Math.round(screenWidth / targetRatio);
+            }
+        }
+        width = Math.max(1, Math.round(width * sizePercent / 100F));
+        height = Math.max(1, Math.round(height * sizePercent / 100F));
+        FrameLayout.LayoutParams params = new FrameLayout.LayoutParams(width, height);
+        params.gravity = android.view.Gravity.CENTER;
+        Log.i(TAG, "Game viewport ratio=" + ratio + ", size=" + sizePercent
+            + "%, viewport=" + width + "x" + height);
+        return params;
     }
 
     private int resolveMaximumShortEdge() {
