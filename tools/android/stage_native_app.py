@@ -25,6 +25,10 @@ def stage(runtime: Path, title: Path, ndk: Path, output: Path) -> None:
     if any(output == path.resolve().parent or path.resolve().is_relative_to(output) for path in source.values()):
         raise ValueError("Stage outside the input library directories")
     destination = output / "arm64-v8a"
+    # Never leave stale desktop, debug, or prior-build libraries in the Android
+    # ABI folder: Gradle consumes the staged directory as a native payload.
+    if destination.exists():
+        shutil.rmtree(destination)
     destination.mkdir(parents=True, exist_ok=True)
     allowed = set(source) | {"libc.so", "libm.so", "libdl.so", "liblog.so", "libandroid.so",
                              "libEGL.so", "libGLESv1_CM.so", "libGLESv2.so", "libGLESv3.so", "libvulkan.so",
