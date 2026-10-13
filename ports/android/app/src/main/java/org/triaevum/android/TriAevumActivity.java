@@ -2,6 +2,7 @@ package org.triaevum.android;
 
 import android.app.Activity;
 import android.content.Context;
+import android.graphics.Color;
 import android.os.Build;
 import android.os.Bundle;
 import android.util.Log;
@@ -88,6 +89,8 @@ public final class TriAevumActivity extends Activity {
         }
 
         mLayout = new FrameLayout(this);
+        // Keep the unused viewport margins pure black instead of the default gray.
+        mLayout.setBackgroundColor(Color.BLACK);
         mLayout.setLayoutParams(new ViewGroup.LayoutParams(
             ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT));
 
