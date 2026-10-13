@@ -46,8 +46,34 @@ tasks.register("checkNativeStage") {
         check(nativeStage.isPresent) {
             "Supply -PtriaevumNativeStage from the Android native build."
         }
-        for (name in listOf("TriAevum", "triaevum_title_bootstrap", "triaevum_title_aot", "c++_shared")) {
-            check(file("${nativeStage.get()}/arm64-v8a/lib$name.so").isFile) { "Missing native library: $name" }
+        val stageRoot = nativeStage.get().asFile
+        val expectedAbis = setOf("arm64-v8a")
+        val actualAbis = stageRoot.listFiles()
+            ?.filter { it.isDirectory }
+            ?.map { it.name }
+            ?.toSet() ?: emptySet()
+        check(actualAbis == expectedAbis) {
+            "Native stage must contain only $expectedAbis; found $actualAbis"
+        }
+
+        val expectedLibraries = setOf(
+            "libTriAevum.so",
+            "libtriaevum_title_bootstrap.so",
+            "libtriaevum_title_aot.so",
+            "libc++_shared.so"
+        )
+        val abiRoot = file("${nativeStage.get()}/arm64-v8a")
+        val actualLibraries = abiRoot.listFiles()
+            ?.filter { it.isFile && it.extension == "so" }
+            ?.map { it.name }
+            ?.toSet() ?: emptySet()
+        check(actualLibraries == expectedLibraries) {
+            "Unexpected native product payload. Expected $expectedLibraries, found $actualLibraries"
+        }
+        for (name in expectedLibraries) {
+            check(file("${nativeStage.get()}/arm64-v8a/$name").isFile) {
+                "Missing native library: $name"
+            }
         }
     }
 }
