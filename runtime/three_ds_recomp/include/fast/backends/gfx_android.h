@@ -62,6 +62,9 @@ class GfxWindowBackendAndroid final : public GfxWindowBackend {
     static void SetGlobalDimensions(uint32_t width, uint32_t height);
     static void SignalStop();
     static void ResetStop();
+    // Call after the Vulkan device is idle and the previous VkSurfaceKHR has
+    // been destroyed/recreated successfully.
+    static void ReleaseRetiredNativeWindowsAfterSurfaceRecreated();
     // Call only after the native game loop and renderer have fully stopped.
     static void ReleaseNativeWindowsAfterRuntimeStopped();
     static bool IsSurfaceAvailable();
