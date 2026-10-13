@@ -11,7 +11,7 @@ The APK is produced by `ports/android/app` (Gradle), not by running the desktop 
 - `libtriaevum_title_aot.so` — translated whole-AOT title module.
 - `libc++_shared.so` — Android C++ runtime.
 
-This packaging boundary matters: desktop executables and test binaries produced by CMake are not copied into the APK by Gradle. The product package uses the staged shared-library directory, not the entire CMake build tree.
+This packaging boundary matters: desktop executables and test binaries produced by CMake are not copied into the APK by Gradle. The product package uses the staged shared-library directory, not the entire CMake build tree. Gradle now rejects any staged ABI other than `arm64-v8a` and any shared-library payload other than the four allowlisted libraries. The staging script recreates that ABI folder before copying, so stale desktop/debug objects cannot silently survive a restage.
 
 ## Desktop-only code and how it is isolated
 
@@ -22,7 +22,7 @@ The following source areas are useful to desktop builds but are not Android prod
 - Apple Metal and Objective-C++ paths.
 - Desktop NRI upscaler SDK integrations (NIS/FSR/NGX providers).
 
-The current CMake configuration guards Windows-only targets/dependencies with platform conditions, enables the NRI upscaler SDKs only when `NOT ANDROID`, and enables D3D12/NGX only for Windows configurations. The Android native build enters the shared runtime through `ports/android/runtime/CMakeLists.txt`; it does not package the desktop launcher or desktop runtime DLLs/frameworks.
+The current CMake configuration removes `gfx_dxgi`/`gfx_direct3d*` sources outside Windows, removes `gfx_metal*` outside Darwin/iOS, removes `gfx_sdl2*` on Android, and includes `gfx_android*` only on Android. It excludes `gfx_opengl*` from Android/iOS. Windows-only targets/dependencies are platform-gated, NRI upscaler SDKs are enabled only when `NOT ANDROID`, and D3D12/NGX is only enabled for Windows configurations. The Android native build enters the shared runtime through `ports/android/runtime/CMakeLists.txt`; it does not package the desktop launcher or desktop runtime DLLs/frameworks.
 
 These backend files should **not** be deleted indiscriminately from the shared source tree: they serve other supported build configurations, and shared PICA/runtime contracts are referenced by AOT generation and validation. Product isolation is achieved through target selection, platform guards, and strict native-library staging.
 
@@ -52,7 +52,7 @@ CMake test executables marked `EXCLUDE_FROM_ALL` are not automatically part of t
 
 The Android runtime currently forces `OOT3D_ENABLE_VULKAN_RENDERER=ON` and the Android renderer CMake project forces Vulkan/NRI on. `gfx_android.cpp` reports `UsesVulkan() == true`, and its GUI/window initialization selects the Vulkan backend. `tools/oot3d/native_game_runtime/oot3d_native_a32_window.cpp` directly constructs PICA Vulkan draw plans and records Vulkan-oriented PICA execution telemetry.
 
-There are generic OpenGL/GLES code paths in `gfx_opengl.cpp`, but that alone is not an Android game renderer. The existing PICA OpenGL implementation (`gfx_opengl_pica.cpp`) explicitly rejects the `USE_OPENGLES` path in operations that require OpenGL 4.3, and no EGL context/surface lifecycle is wired into the current Android window backend. Switching off Vulkan would therefore leave the current AOT PICA renderer without a functioning render/present path.
+There are generic OpenGL/GLES code paths in `gfx_opengl.cpp`, but CMake currently excludes `backends/gfx_opengl.*` from the Android runtime target. Those sources are not even part of the built Android backend today, and that alone is not an Android game renderer. The existing PICA OpenGL implementation (`gfx_opengl_pica.cpp`) explicitly rejects the `USE_OPENGLES` path in operations that require OpenGL 4.3, and no EGL context/surface lifecycle is wired into the current Android window backend. Switching off Vulkan would therefore leave the current AOT PICA renderer without a functioning render/present path.
 
 A real GLES backend is a separate renderer deliverable, not a build-flag edit. It must integrate Android EGL lifecycle; implement or port PICA command/pipeline mapping, shaders compatible with the target GLES version, vertex/index data, texture upload/sampling, render targets/depth, display transfer/composition and UI presentation; preserve synchronization and frame pacing; and have backend-specific correctness tests before device qualification. The existing PICA semantic/decode logic, AOT shader inventories and platform-independent policy code can be reused where they are API-independent, but Vulkan/NRI resource owners, barriers, swapchain code and draw plans cannot be considered GLES-compatible by assumption.
 
