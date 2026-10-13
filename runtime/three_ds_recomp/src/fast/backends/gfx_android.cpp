@@ -117,6 +117,9 @@ void GfxWindowBackendAndroid::NotifySurfaceDestroyed() {
 
 void GfxWindowBackendAndroid::SetGlobalNativeWindow(ANativeWindow* window) {
     if (window != nullptr) {
+        // This compatibility setter accepts a borrowed pointer, unlike the
+        // NotifySurfaceCreated/Changed entry points which adopt fromSurface refs.
+        ANativeWindow_acquire(window);
         NotifySurfaceCreated(window);
     } else {
         NotifySurfaceDestroyed();
