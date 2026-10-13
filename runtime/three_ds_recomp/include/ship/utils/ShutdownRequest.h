@@ -15,7 +15,8 @@ class ShutdownRequest final {
     }
 
     static void HandleSignal(int) noexcept {
-        Request();
+        // Keep the signal handler limited to the already-proven lock-free store.
+        sRequested.store(true, std::memory_order_relaxed);
     }
 
     static bool Requested() noexcept {
