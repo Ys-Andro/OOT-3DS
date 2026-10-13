@@ -6,6 +6,7 @@
 #include <android/native_window.h>
 #include <condition_variable>
 #include <mutex>
+#include <vector>
 #include <spdlog/spdlog.h>
 #include <ship/Context.h>
 #include "fast/Fast3dGui.h"
@@ -17,6 +18,29 @@ static std::mutex sWindowMutex;
 static std::condition_variable sWindowCond;
 static std::condition_variable sRenderPausedCond;
 static ANativeWindow* sGlobalNativeWindow = nullptr;
+// References obtained from ANativeWindow_fromSurface are owned by this backend.
+// Detached windows are retained until renderer/context teardown because Vulkan
+// may still have an in-flight present or a VkSurfaceKHR using the old window.
+static std::vector<ANativeWindow*> sRetiredNativeWindows;
+
+static void RetireCurrentWindowLocked() {
+    if (sGlobalNativeWindow != nullptr) {
+        sRetiredNativeWindows.push_back(sGlobalNativeWindow);
+        sGlobalNativeWindow = nullptr;
+    }
+}
+
+// The caller passes an owned reference obtained from ANativeWindow_fromSurface.
+// Return a redundant reference for immediate release when the object is unchanged.
+static ANativeWindow* AdoptWindowLocked(ANativeWindow* window) {
+    if (window != nullptr && window == sGlobalNativeWindow) {
+        return window;
+    }
+    RetireCurrentWindowLocked();
+    sGlobalNativeWindow = window;
+    return nullptr;
+}
+
 static uint32_t sGlobalWidth = 1280;
 static uint32_t sGlobalHeight = 720;
 static std::atomic<bool> sIsRunningGlobal{true};
@@ -25,43 +49,70 @@ static std::atomic<bool> sRenderThreadWaiting{false};
 
 void GfxWindowBackendAndroid::NotifySurfaceCreated(ANativeWindow* window) {
     __android_log_print(ANDROID_LOG_INFO, "TriAevum", "NotifySurfaceCreated: ANativeWindow=%p", window);
+    ANativeWindow* redundant = nullptr;
     {
         std::unique_lock<std::mutex> lock(sWindowMutex);
-        sGlobalNativeWindow = window;
-        sSurfaceAvailable.store(window != nullptr, std::memory_order_release);
+        redundant = AdoptWindowLocked(window);
+        if (window != nullptr) {
+            const int32_t width = ANativeWindow_getWidth(window);
+            const int32_t height = ANativeWindow_getHeight(window);
+            if (width > 0 && height > 0) {
+                sGlobalWidth = static_cast<uint32_t>(width);
+                sGlobalHeight = static_cast<uint32_t>(height);
+            }
+        }
+        sSurfaceAvailable.store(sGlobalNativeWindow != nullptr, std::memory_order_release);
+    }
+    if (redundant != nullptr) {
+        ANativeWindow_release(redundant);
     }
     sWindowCond.notify_all();
 }
 
 void GfxWindowBackendAndroid::NotifySurfaceChanged(ANativeWindow* window, uint32_t width, uint32_t height) {
     __android_log_print(ANDROID_LOG_INFO, "TriAevum", "NotifySurfaceChanged: ANativeWindow=%p, %ux%u", window, width, height);
+    ANativeWindow* redundant = nullptr;
     {
         std::unique_lock<std::mutex> lock(sWindowMutex);
-        sGlobalNativeWindow = window;
+        redundant = AdoptWindowLocked(window);
         if (width > 0 && height > 0) {
             sGlobalWidth = width;
             sGlobalHeight = height;
         }
-        sSurfaceAvailable.store(window != nullptr, std::memory_order_release);
+        sSurfaceAvailable.store(sGlobalNativeWindow != nullptr, std::memory_order_release);
+    }
+    if (redundant != nullptr) {
+        ANativeWindow_release(redundant);
     }
     sWindowCond.notify_all();
 }
 
 void GfxWindowBackendAndroid::NotifySurfaceDestroyed() {
-    __android_log_print(ANDROID_LOG_INFO, "TriAevum", "NotifySurfaceDestroyed: waiting for render thread to pause");
+    __android_log_print(ANDROID_LOG_INFO, "TriAevum", "NotifySurfaceDestroyed: requesting render-thread pause");
+    {
+        std::lock_guard<std::mutex> lock(sWindowMutex);
+        sSurfaceAvailable.store(false, std::memory_order_release);
+        RetireCurrentWindowLocked();
+    }
+
+    // Wake IsFrameReady before waiting for acknowledgement. Keep the detached
+    // reference: renderer teardown may still be using its Vulkan surface.
+    sWindowCond.notify_all();
+
+    bool acknowledged = false;
     {
         std::unique_lock<std::mutex> lock(sWindowMutex);
-        sSurfaceAvailable.store(false, std::memory_order_release);
-        sGlobalNativeWindow = nullptr;
-
-        // Give the render thread up to 250ms to reach IsFrameReady and pause
-        sRenderPausedCond.wait_for(lock, std::chrono::milliseconds(250), [] {
+        acknowledged = sRenderPausedCond.wait_for(lock, std::chrono::milliseconds(250), [] {
             return sRenderThreadWaiting.load(std::memory_order_acquire) ||
                    !sIsRunningGlobal.load(std::memory_order_relaxed);
         });
     }
-    sWindowCond.notify_all();
-    __android_log_print(ANDROID_LOG_INFO, "TriAevum", "NotifySurfaceDestroyed: render thread acknowledged, surface safely detached");
+
+    if (acknowledged) {
+        __android_log_print(ANDROID_LOG_INFO, "TriAevum", "NotifySurfaceDestroyed: render thread reached a frame boundary; native reference retained");
+    } else {
+        __android_log_print(ANDROID_LOG_WARN, "TriAevum", "NotifySurfaceDestroyed: render pause timed out; native reference retained until runtime shutdown");
+    }
 }
 
 void GfxWindowBackendAndroid::SetGlobalNativeWindow(ANativeWindow* window) {
@@ -93,6 +144,32 @@ void GfxWindowBackendAndroid::SignalStop() {
     sIsRunningGlobal.store(false, std::memory_order_relaxed);
     sWindowCond.notify_all();
     sRenderPausedCond.notify_all();
+}
+
+void GfxWindowBackendAndroid::ResetStop() {
+    std::lock_guard<std::mutex> lock(sWindowMutex);
+    sRenderThreadWaiting.store(false, std::memory_order_release);
+    sIsRunningGlobal.store(true, std::memory_order_release);
+    sSurfaceAvailable.store(sGlobalNativeWindow != nullptr, std::memory_order_release);
+    sWindowCond.notify_all();
+}
+
+void GfxWindowBackendAndroid::ReleaseNativeWindowsAfterRuntimeStopped() {
+    std::vector<ANativeWindow*> windows;
+    {
+        std::lock_guard<std::mutex> lock(sWindowMutex);
+        sSurfaceAvailable.store(false, std::memory_order_release);
+        RetireCurrentWindowLocked();
+        windows.swap(sRetiredNativeWindows);
+    }
+    sWindowCond.notify_all();
+    sRenderPausedCond.notify_all();
+
+    for (ANativeWindow* window : windows) {
+        if (window != nullptr) {
+            ANativeWindow_release(window);
+        }
+    }
 }
 
 GfxWindowBackendAndroid::GfxWindowBackendAndroid()
