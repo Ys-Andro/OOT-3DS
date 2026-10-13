@@ -173,10 +173,16 @@ void GfxWindowBackendAndroid::ReleaseNativeWindowsAfterRuntimeStopped() {
 }
 
 GfxWindowBackendAndroid::GfxWindowBackendAndroid()
-    : mNativeWindow(sGlobalNativeWindow),
-      mWidth(sGlobalWidth),
-      mHeight(sGlobalHeight),
+    : mNativeWindow(nullptr),
+      mWidth(1280),
+      mHeight(720),
       mStartTime(std::chrono::steady_clock::now()) {
+    {
+        std::lock_guard<std::mutex> lock(sWindowMutex);
+        mNativeWindow = sGlobalNativeWindow;
+        mWidth = sGlobalWidth;
+        mHeight = sGlobalHeight;
+    }
     mFullScreen = true;
     mIsRunning = true;
     mTargetFps = 60;
@@ -194,16 +200,25 @@ void GfxWindowBackendAndroid::Init(const char* gameName, const char* apiName, bo
     (void)apiName;
     (void)startFullScreen;
 
-    mWidth = width > 0 ? width : sGlobalWidth;
-    mHeight = height > 0 ? height : sGlobalHeight;
+    ANativeWindow* globalWindow = nullptr;
+    uint32_t globalWidth = 1280;
+    uint32_t globalHeight = 720;
+    {
+        std::lock_guard<std::mutex> lock(sWindowMutex);
+        globalWindow = sGlobalNativeWindow;
+        globalWidth = sGlobalWidth;
+        globalHeight = sGlobalHeight;
+    }
+
+    mWidth = width > 0 ? width : globalWidth;
+    mHeight = height > 0 ? height : globalHeight;
     mPosX = posX;
     mPosY = posY;
     mFullScreen = true;
     mIsRunning = true;
-
-    if (mNativeWindow == nullptr) {
-        mNativeWindow = sGlobalNativeWindow;
-    }
+    // Always refresh the non-owning view to the current global window. Older
+    // window references remain owned by the backend until runtime teardown.
+    mNativeWindow = globalWindow;
 
     if (mNativeWindow != nullptr) {
         int32_t realWidth = ANativeWindow_getWidth(mNativeWindow);
