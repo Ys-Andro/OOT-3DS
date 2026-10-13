@@ -181,7 +181,12 @@ public final class TriAevumActivity extends Activity {
 
     private int resolveMaximumShortEdge() {
         int maximumShortEdge = 720;
-        File config = new File(getExternalFilesDir(null), "TriAevum.android.host.json");
+        File storageRoot = getExternalFilesDir(null);
+        if (storageRoot == null) {
+            Log.w(TAG, "App-specific external storage unavailable; using default surface extent");
+            return maximumShortEdge;
+        }
+        File config = new File(storageRoot, "TriAevum.android.host.json");
         if (config.isFile()) {
             try {
                 maximumShortEdge = new JSONObject(new String(Files.readAllBytes(config.toPath()), StandardCharsets.UTF_8))
