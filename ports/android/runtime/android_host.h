@@ -2,6 +2,7 @@
 
 #include <atomic>
 #include <cstdint>
+#include <memory>
 #include <string>
 
 struct AndroidOverlayInputState {
@@ -26,7 +27,7 @@ AndroidOverlayInputState &GetAndroidOverlayInputState();
 void InitializeAndroidGameHost();
 void ShutdownAndroidGameHost();
 void SetAndroidStoragePath(const std::string &path);
-const std::string &GetAndroidStoragePath();
+std::string GetAndroidStoragePath();
 int RunOot3dNativeGameMain(int argc, char** argv);
 
 void RegisterAndroidTopScreenConfigRuntime(
