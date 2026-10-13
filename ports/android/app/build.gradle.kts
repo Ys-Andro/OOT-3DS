@@ -12,6 +12,8 @@ dependencies {
 
 // Native compilation is a separate incremental build, never a Gradle side effect.
 val nativeStage = providers.gradleProperty("triaevumNativeStage")
+val triaevumVersionCode = providers.gradleProperty("triaevumVersionCode").orNull?.toIntOrNull() ?: 1
+val triaevumVersionName = providers.gradleProperty("triaevumVersionName").orElse("0.1-intro-dev").get()
 android {
     namespace = "org.triaevum.android"
     compileSdk = 35
@@ -19,8 +21,8 @@ android {
         applicationId = "org.triaevum.android"
         minSdk = 29
         targetSdk = 33
-        versionCode = 1
-        versionName = "0.1-intro-dev"
+        versionCode = triaevumVersionCode
+        versionName = triaevumVersionName
         ndk { abiFilters += "arm64-v8a" }
     }
     compileOptions {
