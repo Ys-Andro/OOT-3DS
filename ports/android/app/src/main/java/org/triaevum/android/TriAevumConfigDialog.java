@@ -410,9 +410,17 @@ public final class TriAevumConfigDialog extends Dialog {
         Button btnRestore = findViewById(R.id.btn_config_restore);
 
         btnSave.setOnClickListener(v -> {
+            String previousFrameRate = mConfig.getFrameRateMode();
+            int previousSurfaceLimit = mConfig.getSurfaceMaxShortEdge();
             saveToConfig();
             mConfig.applyLiveSettings();
-            Toast.makeText(getContext(), "¡Configuración guardada y aplicada!", Toast.LENGTH_SHORT).show();
+            boolean restartRequired =
+                !previousFrameRate.equals(mConfig.getFrameRateMode()) ||
+                previousSurfaceLimit != mConfig.getSurfaceMaxShortEdge();
+            String message = restartRequired
+                ? "Configuración guardada. Reinicia el juego para aplicar los cambios de FPS o resolución."
+                : "¡Configuración guardada y aplicada!";
+            Toast.makeText(getContext(), message, Toast.LENGTH_LONG).show();
             dismiss();
         });
 
@@ -442,7 +450,7 @@ public final class TriAevumConfigDialog extends Dialog {
                 Log.w(TAG, "Failed to reset native control settings", t);
             }
             loadFromConfig();
-            Toast.makeText(getContext(), "Valores predeterminados restaurados y aplicados.", Toast.LENGTH_SHORT).show();
+            Toast.makeText(getContext(), "Valores predeterminados restaurados. Reinicia el juego para aplicar FPS y resolución.", Toast.LENGTH_LONG).show();
         });
     }
 
