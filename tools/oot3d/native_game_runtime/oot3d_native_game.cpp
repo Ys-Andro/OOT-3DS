@@ -263,6 +263,13 @@ int RunOot3dNativeGameMain(int argc, char** argv) {
 #endif
         DestroyContextForDemo();
         return 1;
+    } catch (...) {
+        std::cerr << "oot3d_native_game: non-standard exception\n";
+#if defined(__SWITCH__)
+        WriteSwitchBootStatus("failed", "non-standard exception");
+#endif
+        DestroyContextForDemo();
+        return 1;
     }
 }
 
