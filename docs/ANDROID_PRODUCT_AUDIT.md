@@ -40,7 +40,7 @@ CMake test executables marked `EXCLUDE_FROM_ALL` are not automatically part of t
 
 ## Android host fixes in this branch
 
-- `ANativeWindow_fromSurface` returns an owned reference. `NotifySurfaceCreated/Changed` releases duplicate references when the same native window is reported repeatedly; old windows are retained while the renderer may still own Vulkan surface/swapchain resources. After the renderer waits for outstanding presents and device idle, then successfully destroys/recreates its `VkSurfaceKHR`, it releases retired-window references. If no replacement surface becomes available, the final native-runtime teardown releases them instead.
+- `ANativeWindow_fromSurface` returns an owned reference. `NotifySurfaceCreated/Changed` adopts that reference and releases duplicates when the same native window is reported repeatedly; the compatibility setter accepts a borrowed pointer and acquires its own reference. Old windows are retained while the renderer may still own Vulkan surface/swapchain resources. After the renderer waits for outstanding presents and device idle, then successfully destroys/recreates its `VkSurfaceKHR`, it releases retired-window references. If no replacement surface becomes available, the final native-runtime teardown releases them instead.
 - Surface destruction wakes the render wait before waiting briefly for a frame-boundary acknowledgement. A timeout is logged as a timeout; it is no longer described as a guaranteed safe detach.
 - `nativePrepareSession` clears the shared shutdown request and resets the host's stop flag for a fresh native session.
 - `nativeRequestShutdown` requests normal-loop termination and wakes any wait in `IsFrameReady`.
