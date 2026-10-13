@@ -202,7 +202,14 @@ public final class TriAevumActivity extends Activity {
         else if ("18:9".equals(ratio)) targetRatio = 2F;
         else if ("20:9".equals(ratio)) targetRatio = 20F / 9F;
 
-        if (targetRatio > 0F) {
+        if ("custom".equals(ratio)) {
+            int customWidth = Math.max(50, Math.min(100,
+                prefs.getInt("TriAevum_CustomWidthPercent", 100)));
+            int customHeight = Math.max(50, Math.min(100,
+                prefs.getInt("TriAevum_CustomHeightPercent", 100)));
+            width = Math.round(screenWidth * customWidth / 100F);
+            height = Math.round(screenHeight * customHeight / 100F);
+        } else if (targetRatio > 0F) {
             float screenRatio = (float) screenWidth / (float) screenHeight;
             if (screenRatio > targetRatio) {
                 width = Math.round(screenHeight * targetRatio);
