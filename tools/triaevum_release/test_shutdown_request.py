@@ -44,5 +44,32 @@ int main() {
             subprocess.run([str(binary)], check=True, capture_output=True, timeout=10)
 
 
+    def test_explicit_shutdown_request_is_idempotent_and_resettable(self):
+        compiler = os.environ.get('TRIAEVUM_TEST_CXX') or shutil.which('clang++') or shutil.which('g++')
+        if not compiler:
+            self.skipTest('C++ compiler required')
+        include = Path(__file__).resolve().parents[2] / 'runtime/three_ds_recomp/include'
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            source = root / 'request.cpp'
+            source.write_text(r'''
+#include "ship/utils/ShutdownRequest.h"
+int main() {
+    Ship::ShutdownRequest::Reset();
+    if (Ship::ShutdownRequest::Requested()) return 1;
+    Ship::ShutdownRequest::Request();
+    if (!Ship::ShutdownRequest::Requested()) return 2;
+    Ship::ShutdownRequest::Request();
+    if (!Ship::ShutdownRequest::Requested()) return 3;
+    Ship::ShutdownRequest::Reset();
+    return Ship::ShutdownRequest::Requested() ? 4 : 0;
+}
+''')
+            binary = root / ('request.exe' if os.name == 'nt' else 'request')
+            subprocess.run([compiler, '-std=c++17', '-I', str(include), str(source),
+                            '-o', str(binary)], check=True, capture_output=True, timeout=60)
+            subprocess.run([str(binary)], check=True, capture_output=True, timeout=10)
+
+
 if __name__ == '__main__':
     unittest.main()
