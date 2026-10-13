@@ -248,7 +248,7 @@ public final class TriAevumConfigDialog extends Dialog {
         mCbFreeCamera.setChecked(mConfig.isFreeCameraEnabled());
         int speedLevel = mConfig.getFreeCameraSpeedLevel();
         mSbCamSpeed.setProgress(speedLevel - 1); // 0-4 → levels 1-5
-        mTvCamSpeedLabel.setText("Velocidade: " + speedLevel);
+        mTvCamSpeedLabel.setText("Velocidad: " + speedLevel);
         mCbCamInvertX.setChecked(mConfig.isFreeCameraInvertX());
         mCbCamInvertY.setChecked(mConfig.isFreeCameraInvertY());
 
@@ -267,15 +267,15 @@ public final class TriAevumConfigDialog extends Dialog {
         // map 0.5-1.5 → seekbar 0-10
         int hudProg = Math.round((hudScale - 0.5f) / 0.1f);
         mSbHudScale.setProgress(Math.max(0, Math.min(10, hudProg)));
-        mTvHudScaleLabel.setText("Escala HUD: " + hudPct + "%");
+        mTvHudScaleLabel.setText("Escala del HUD: " + hudPct + "%");
 
         // Margins (-3..16 -> seekbar 0..19)
         int marginX = mConfig.getHudMarginX();
         int marginY = mConfig.getHudMarginY();
         mSbHudMarginX.setProgress(Math.max(0, Math.min(19, marginX + 3)));
-        mTvHudMarginXLabel.setText("Margem X (Horizontal): " + marginX);
+        mTvHudMarginXLabel.setText("Margen X (horizontal): " + marginX);
         mSbHudMarginY.setProgress(Math.max(0, Math.min(19, marginY + 3)));
-        mTvHudMarginYLabel.setText("Margem Y (Vertical): " + marginY);
+        mTvHudMarginYLabel.setText("Margen Y (vertical): " + marginY);
 
         mCbMinimap.setChecked(mConfig.isMinimapVisible());
         mCbDpadIcons.setChecked(mConfig.isRenderDpadIcons());
@@ -317,12 +317,12 @@ public final class TriAevumConfigDialog extends Dialog {
         int overlayOpacity = 100;
         if (mOverlay != null) overlayOpacity = mOverlay.getOverlayOpacityPercent();
         mSbOpacity.setProgress(overlayOpacity);
-        mTvOpacityLabel.setText("Opacidade dos Controles: " + overlayOpacity + "%");
+        mTvOpacityLabel.setText("Opacidad de los controles: " + overlayOpacity + "%");
 
         // SeekBar live listeners
         mSbCamSpeed.setOnSeekBarChangeListener(new SeekBar.OnSeekBarChangeListener() {
             @Override public void onProgressChanged(SeekBar sb, int progress, boolean fromUser) {
-                mTvCamSpeedLabel.setText("Velocidade: " + (progress + 1));
+                mTvCamSpeedLabel.setText("Velocidad: " + (progress + 1));
             }
             @Override public void onStartTrackingTouch(SeekBar sb) {}
             @Override public void onStopTrackingTouch(SeekBar sb) {}
@@ -331,7 +331,7 @@ public final class TriAevumConfigDialog extends Dialog {
         mSbHudScale.setOnSeekBarChangeListener(new SeekBar.OnSeekBarChangeListener() {
             @Override public void onProgressChanged(SeekBar sb, int progress, boolean fromUser) {
                 float scale = 0.5f + progress * 0.1f;
-                mTvHudScaleLabel.setText("Escala HUD: " + Math.round(scale * 100) + "%");
+                mTvHudScaleLabel.setText("Escala del HUD: " + Math.round(scale * 100) + "%");
             }
             @Override public void onStartTrackingTouch(SeekBar sb) {}
             @Override public void onStopTrackingTouch(SeekBar sb) {}
@@ -340,7 +340,7 @@ public final class TriAevumConfigDialog extends Dialog {
         mSbHudMarginX.setOnSeekBarChangeListener(new SeekBar.OnSeekBarChangeListener() {
             @Override public void onProgressChanged(SeekBar sb, int progress, boolean fromUser) {
                 int val = progress - 3;
-                mTvHudMarginXLabel.setText("Margem X (Horizontal): " + val);
+                mTvHudMarginXLabel.setText("Margen X (horizontal): " + val);
             }
             @Override public void onStartTrackingTouch(SeekBar sb) {}
             @Override public void onStopTrackingTouch(SeekBar sb) {}
@@ -349,7 +349,7 @@ public final class TriAevumConfigDialog extends Dialog {
         mSbHudMarginY.setOnSeekBarChangeListener(new SeekBar.OnSeekBarChangeListener() {
             @Override public void onProgressChanged(SeekBar sb, int progress, boolean fromUser) {
                 int val = progress - 3;
-                mTvHudMarginYLabel.setText("Margem Y (Vertical): " + val);
+                mTvHudMarginYLabel.setText("Margen Y (vertical): " + val);
             }
             @Override public void onStartTrackingTouch(SeekBar sb) {}
             @Override public void onStopTrackingTouch(SeekBar sb) {}
@@ -358,7 +358,7 @@ public final class TriAevumConfigDialog extends Dialog {
         mSbOpacity.setOnSeekBarChangeListener(new SeekBar.OnSeekBarChangeListener() {
             @Override public void onProgressChanged(SeekBar sb, int progress, boolean fromUser) {
                 int pct = Math.max(20, progress); // minimum 20%
-                mTvOpacityLabel.setText("Opacidade dos Controles: " + pct + "%");
+                mTvOpacityLabel.setText("Opacidad de los controles: " + pct + "%");
                 if (fromUser && mOverlay != null) {
                     mOverlay.setOverlayOpacityPercent(pct);
                 }
@@ -412,7 +412,7 @@ public final class TriAevumConfigDialog extends Dialog {
         btnSave.setOnClickListener(v -> {
             saveToConfig();
             mConfig.applyLiveSettings();
-            Toast.makeText(getContext(), "Configurações salvas e aplicadas!", Toast.LENGTH_SHORT).show();
+            Toast.makeText(getContext(), "¡Configuración guardada y aplicada!", Toast.LENGTH_SHORT).show();
             dismiss();
         });
 
@@ -442,7 +442,7 @@ public final class TriAevumConfigDialog extends Dialog {
                 Log.w(TAG, "Failed to reset native control settings", t);
             }
             loadFromConfig();
-            Toast.makeText(getContext(), "Padrões restaurados e aplicados.", Toast.LENGTH_SHORT).show();
+            Toast.makeText(getContext(), "Valores predeterminados restaurados y aplicados.", Toast.LENGTH_SHORT).show();
         });
     }
 
