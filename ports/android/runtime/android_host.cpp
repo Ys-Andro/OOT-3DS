@@ -19,6 +19,7 @@
 #include <ship/config/Config.h>
 
 #include "fast/backends/gfx_android.h"
+#include "ship/utils/ShutdownRequest.h"
 #include "fast/oot3d/graphics_settings_persistence.h"
 #include "fast/oot3d/graphics_settings_runtime.h"
 #include "oot3d_top_screen_config.h"
@@ -108,6 +109,13 @@ void ShutdownAndroidGameHost() {
   state.cStickX.store(0.0f, std::memory_order_relaxed);
   state.cStickY.store(0.0f, std::memory_order_relaxed);
   state.touchPressed.store(false, std::memory_order_relaxed);
+  state.touchX.store(0.0f, std::memory_order_relaxed);
+  state.touchY.store(0.0f, std::memory_order_relaxed);
+
+  // Called only after RunOot3dNativeGameMain returns, after renderer/context
+  // destruction. Retained ANativeWindow references are safe to release now.
+  Fast::GfxWindowBackendAndroid::SignalStop();
+  Fast::GfxWindowBackendAndroid::ReleaseNativeWindowsAfterRuntimeStopped();
 }
 
 extern "C" {
@@ -207,6 +215,27 @@ Java_org_triaevum_android_TriAevumConfigManager_nativeReloadGraphicsSettings(
 // Native activity lifecycle and surface management (replacing SDLActivity)
 
 JNIEXPORT void JNICALL
+Java_org_triaevum_android_TriAevumActivity_nativePrepareSession(
+    JNIEnv * /*env*/, jclass /*clazz*/) {
+  Ship::ShutdownRequest::Reset();
+  Fast::GfxWindowBackendAndroid::ResetStop();
+}
+
+JNIEXPORT void JNICALL
+Java_org_triaevum_android_TriAevumActivity_nativeRequestShutdown(
+    JNIEnv * /*env*/, jclass /*clazz*/) {
+  auto &state = GetAndroidOverlayInputState();
+  state.buttons.store(0, std::memory_order_relaxed);
+  state.circlePadX.store(0.0f, std::memory_order_relaxed);
+  state.circlePadY.store(0.0f, std::memory_order_relaxed);
+  state.cStickX.store(0.0f, std::memory_order_relaxed);
+  state.cStickY.store(0.0f, std::memory_order_relaxed);
+  state.touchPressed.store(false, std::memory_order_relaxed);
+  Ship::ShutdownRequest::Request();
+  Fast::GfxWindowBackendAndroid::SignalStop();
+}
+
+JNIEXPORT void JNICALL
 Java_org_triaevum_android_TriAevumActivity_nativeSetStoragePath(
     JNIEnv *env, jclass /*clazz*/, jstring path) {
   if (path != nullptr) {
@@ -287,6 +316,7 @@ Java_org_triaevum_android_TriAevumActivity_nativeMain(
   __android_log_print(ANDROID_LOG_INFO, "TriAevum", "Starting RunOot3dNativeGameMain with %d args", argc);
   int result = RunOot3dNativeGameMain(argc, argv.data());
   __android_log_print(ANDROID_LOG_INFO, "TriAevum", "RunOot3dNativeGameMain exited with code %d", result);
+  ShutdownAndroidGameHost();
 }
 
 } // extern "C"
