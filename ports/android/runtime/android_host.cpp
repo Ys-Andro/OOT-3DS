@@ -236,6 +236,14 @@ Java_org_triaevum_android_TriAevumActivity_nativeRequestShutdown(
 }
 
 JNIEXPORT void JNICALL
+Java_org_triaevum_android_TriAevumActivity_nativeShutdownIdleHost(
+    JNIEnv * /*env*/, jclass /*clazz*/) {
+  // Java calls this only when the game thread never started or has already
+  // returned. It balances any surface references created before game startup.
+  ShutdownAndroidGameHost();
+}
+
+JNIEXPORT void JNICALL
 Java_org_triaevum_android_TriAevumActivity_nativeSetStoragePath(
     JNIEnv *env, jclass /*clazz*/, jstring path) {
   if (path != nullptr) {
