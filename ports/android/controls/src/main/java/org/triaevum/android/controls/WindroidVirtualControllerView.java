@@ -84,6 +84,9 @@ public class WindroidVirtualControllerView extends View {
     private SharedPreferences preferences;
     public boolean isEditing = false;
     private int touchscreenPointerId = -1;
+    private int editorPointerId = -1;
+    private int editorTargetType = 0; // 1=button, 2=left analog, 3=right analog, 4=D-pad
+    private int editorTargetIndex = -1;
 
     private float scaleX = 1.0F;
     private float scaleY = 1.0F;
@@ -125,6 +128,89 @@ public class WindroidVirtualControllerView extends View {
     public WindroidVirtualControllerView(Context context, AttributeSet attrs, int defStyleAttr) {
         super(context, attrs, defStyleAttr);
         init();
+    }
+
+    public void setEditing(boolean editing) {
+        isEditing = editing;
+        editorPointerId = -1;
+        editorTargetType = 0;
+        editorTargetIndex = -1;
+        if (editing) releaseAllControls();
+        invalidate();
+    }
+
+    public void resetCustomLayout() {
+        if (preferences != null) {
+            SharedPreferences.Editor e = preferences.edit().putBoolean("VC_CUSTOM_USER_SAVED", false);
+            for (VirtualControllerButton btn : buttonList) {
+                e.remove("VC_BUTTON_" + btn.id + "_X").remove("VC_BUTTON_" + btn.id + "_Y");
+            }
+            e.remove("VC_BUTTON_" + LEFT_ANALOG + "_X").remove("VC_BUTTON_" + LEFT_ANALOG + "_Y");
+            e.remove("VC_BUTTON_" + RIGHT_ANALOG + "_X").remove("VC_BUTTON_" + RIGHT_ANALOG + "_Y");
+            e.remove("VC_BUTTON_DPAD_X").remove("VC_BUTTON_DPAD_Y").apply();
+        }
+        adjustButtons(getWidth(), getHeight());
+        invalidate();
+    }
+
+    private void saveEditedLayout() {
+        if (preferences == null) return;
+        SharedPreferences.Editor e = preferences.edit().putBoolean("VC_CUSTOM_USER_SAVED", true);
+        for (VirtualControllerButton btn : buttonList) {
+            e.putFloat("VC_BUTTON_" + btn.id + "_X", btn.x)
+             .putFloat("VC_BUTTON_" + btn.id + "_Y", btn.y);
+        }
+        e.putFloat("VC_BUTTON_" + LEFT_ANALOG + "_X", leftAnalog.x)
+         .putFloat("VC_BUTTON_" + LEFT_ANALOG + "_Y", leftAnalog.y)
+         .putFloat("VC_BUTTON_" + RIGHT_ANALOG + "_X", rightAnalog.x)
+         .putFloat("VC_BUTTON_" + RIGHT_ANALOG + "_Y", rightAnalog.y)
+         .putFloat("VC_BUTTON_DPAD_X", dpad.x)
+         .putFloat("VC_BUTTON_DPAD_Y", dpad.y)
+         .apply();
+    }
+
+    private void beginControlDrag(float x, float y, int pointerId) {
+        float best = Float.MAX_VALUE;
+        editorTargetType = 0;
+        editorTargetIndex = -1;
+        for (int i = 0; i < buttonList.size(); i++) {
+            VirtualControllerButton b = buttonList.get(i);
+            float d = distanceSquared(x, y, b.x, b.y);
+            if (d < best) { best = d; editorTargetType = 1; editorTargetIndex = i; }
+        }
+        float dLeft = distanceSquared(x, y, leftAnalog.x, leftAnalog.y);
+        if (dLeft < best) { best = dLeft; editorTargetType = 2; editorTargetIndex = -1; }
+        float dRight = distanceSquared(x, y, rightAnalog.x, rightAnalog.y);
+        if (dRight < best) { best = dRight; editorTargetType = 3; editorTargetIndex = -1; }
+        float dDpad = distanceSquared(x, y, dpad.x, dpad.y);
+        if (dDpad < best) { best = dDpad; editorTargetType = 4; editorTargetIndex = -1; }
+        float hitRadius = Math.max(100F * scaleFactor, 72F);
+        if (best > hitRadius * hitRadius) { editorTargetType = 0; return; }
+        editorPointerId = pointerId;
+        moveEditedControl(x, y);
+    }
+
+    private float distanceSquared(float x1, float y1, float x2, float y2) {
+        float dx = x1 - x2, dy = y1 - y2;
+        return dx * dx + dy * dy;
+    }
+
+    private void moveEditedControl(float x, float y) {
+        float margin = 45F * scaleFactor;
+        x = Math.max(margin, Math.min(getWidth() - margin, x));
+        y = Math.max(margin, Math.min(getHeight() - margin, y));
+        if (editorTargetType == 1 && editorTargetIndex >= 0) {
+            VirtualControllerButton b = buttonList.get(editorTargetIndex);
+            b.x = x; b.y = y;
+        } else if (editorTargetType == 2) {
+            leftAnalog.x = x; leftAnalog.y = y;
+        } else if (editorTargetType == 3) {
+            rightAnalog.x = x; rightAnalog.y = y;
+        } else if (editorTargetType == 4) {
+            dpad.x = x; dpad.y = y;
+        }
+        saveEditedLayout();
+        invalidate();
     }
 
     public void bindInputTarget(Native3dsInputTarget target) {
@@ -400,6 +486,15 @@ public class WindroidVirtualControllerView extends View {
 
         // ---- Settings gear button (always drawn, scales uniformly with min floor) ----
         drawSettingsButton(canvas, alphaFactor);
+        if (isEditing) {
+            Paint editPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
+            editPaint.setColor(Color.YELLOW);
+            editPaint.setTextAlign(Paint.Align.CENTER);
+            editPaint.setTextSize(Math.max(18F, 30F * scaleFactor));
+            editPaint.setStyle(Paint.Style.FILL);
+            canvas.drawText("MODO EDICIÓN: arrastra los controles · toca ⚙ para salir",
+                getWidth() / 2F, Math.min(getHeight() - 20F, 58F * scaleFactor), editPaint);
+        }
 
         if (!mShowControls) {
             return;
@@ -743,6 +838,12 @@ public class WindroidVirtualControllerView extends View {
                     }
                 }
 
+                if (isEditing) {
+                    if (!hit) beginControlDrag(px, py, pointerId);
+                    invalidate();
+                    return true;
+                }
+
                 if (!hit && mShowControls) {
                     // 1. Check ABXY, Triggers (LT, LB, RT, RB), Start and Select
                     for (VirtualControllerButton btn : buttonList) {
@@ -799,6 +900,17 @@ public class WindroidVirtualControllerView extends View {
                 break;
             }
             case MotionEvent.ACTION_MOVE: {
+                if (isEditing) {
+                    if (editorPointerId != -1) {
+                        for (int i = 0; i < event.getPointerCount(); i++) {
+                            if (event.getPointerId(i) == editorPointerId) {
+                                moveEditedControl(event.getX(i), event.getY(i));
+                                break;
+                            }
+                        }
+                    }
+                    return true;
+                }
                 for (int i = 0; i < event.getPointerCount(); i++) {
                     int pId = event.getPointerId(i);
                     float curX = event.getX(i);
@@ -828,6 +940,10 @@ public class WindroidVirtualControllerView extends View {
                 break;
             }
             case MotionEvent.ACTION_POINTER_UP: {
+                if (isEditing && pointerId == editorPointerId) {
+                    editorPointerId = -1; editorTargetType = 0; editorTargetIndex = -1;
+                    return true;
+                }
                 for (VirtualControllerButton btn : buttonList) {
                     if (btn.fingerId == pointerId) {
                         btn.fingerId = -1;
@@ -864,6 +980,11 @@ public class WindroidVirtualControllerView extends View {
             }
             case MotionEvent.ACTION_UP:
             case MotionEvent.ACTION_CANCEL: {
+                if (isEditing && editorPointerId == pointerId) {
+                    editorPointerId = -1; editorTargetType = 0; editorTargetIndex = -1;
+                    invalidate();
+                    return true;
+                }
                 // Settings gear button release
                 if (mSettingsBtnPressed && pointerId == mSettingsPointerId) {
                     mSettingsBtnPressed = false;
