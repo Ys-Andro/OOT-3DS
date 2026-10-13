@@ -111,7 +111,7 @@ void GfxWindowBackendAndroid::NotifySurfaceDestroyed() {
     if (acknowledged) {
         __android_log_print(ANDROID_LOG_INFO, "TriAevum", "NotifySurfaceDestroyed: render thread reached a frame boundary; native reference retained");
     } else {
-        __android_log_print(ANDROID_LOG_WARN, "TriAevum", "NotifySurfaceDestroyed: render pause timed out; native reference retained until runtime shutdown");
+        __android_log_print(ANDROID_LOG_WARN, "TriAevum", "NotifySurfaceDestroyed: render pause timed out; reference retained until safe surface recreation or runtime shutdown");
     }
 }
 
