@@ -154,6 +154,19 @@ void GfxWindowBackendAndroid::ResetStop() {
     sWindowCond.notify_all();
 }
 
+void GfxWindowBackendAndroid::ReleaseRetiredNativeWindowsAfterSurfaceRecreated() {
+    std::vector<ANativeWindow*> windows;
+    {
+        std::lock_guard<std::mutex> lock(sWindowMutex);
+        windows.swap(sRetiredNativeWindows);
+    }
+    for (ANativeWindow* window : windows) {
+        if (window != nullptr) {
+            ANativeWindow_release(window);
+        }
+    }
+}
+
 void GfxWindowBackendAndroid::ReleaseNativeWindowsAfterRuntimeStopped() {
     std::vector<ANativeWindow*> windows;
     {
