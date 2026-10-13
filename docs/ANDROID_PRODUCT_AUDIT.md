@@ -24,7 +24,7 @@ The following source areas are useful to desktop builds but are not Android prod
 
 The current CMake configuration removes `gfx_dxgi`/`gfx_direct3d*` sources outside Windows, removes `gfx_metal*` outside Darwin/iOS, removes `gfx_sdl2*` on Android, and includes `gfx_android*` only on Android. It excludes `gfx_opengl*` from Android/iOS. Windows-only targets/dependencies are platform-gated, NRI upscaler SDKs are enabled only when `NOT ANDROID`, and D3D12/NGX is only enabled for Windows configurations. The Android native build enters the shared runtime through `ports/android/runtime/CMakeLists.txt`; it does not package the desktop launcher or desktop runtime DLLs/frameworks.
 
-These backend files should **not** be deleted indiscriminately from the shared source tree: they serve other supported build configurations, and shared PICA/runtime contracts are referenced by AOT generation and validation. Product isolation is achieved through target selection, platform guards, and strict native-library staging.
+These backend files should **not** be deleted indiscriminately from the shared source tree: they serve other supported build configurations, and shared PICA/runtime contracts are referenced by AOT generation and validation. Product isolation is achieved through target selection, platform guards, and strict native-library staging. The verified filters live in `runtime/three_ds_recomp/src/fast/CMakeLists.txt`; platform audio selection is in `runtime/three_ds_recomp/src/ship/CMakeLists.txt`. Those source lists, rather than deleting files from the repository, are the correct boundary for preventing desktop implementations from entering the Android runtime.
 
 ## AOT and validation tools intentionally retained
 
