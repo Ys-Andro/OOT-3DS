@@ -38,6 +38,7 @@ public final class TriAevumActivity extends Activity {
     public static native void nativeSetStoragePath(String path);
     public static native void nativePrepareSession();
     public static native void nativeRequestShutdown();
+    public static native void nativeShutdownIdleHost();
     public static native void nativeSurfaceCreated(Surface surface);
     public static native void nativeSurfaceChanged(Surface surface, int width, int height);
     public static native void nativeSurfaceDestroyed();
@@ -454,6 +455,10 @@ public final class TriAevumActivity extends Activity {
             if (interrupted) {
                 Thread.currentThread().interrupt();
             }
+        } else {
+            // A window can be created before startup fails (for example when
+            // app-specific storage is unavailable); release its native refs too.
+            nativeShutdownIdleHost();
         }
         super.onDestroy();
     }
