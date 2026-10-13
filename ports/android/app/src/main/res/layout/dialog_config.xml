@@ -535,6 +535,33 @@
                     android:orientation="vertical"
                     android:padding="4dp">
 
+                    <!-- Pantalla: proporción y tamaño -->
+                    <LinearLayout
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:background="@drawable/card_bg"
+                        android:orientation="vertical"
+                        android:padding="8dp"
+                        android:layout_marginBottom="6dp">
+                        <TextView android:layout_width="wrap_content" android:layout_height="wrap_content"
+                            android:text="PANTALLA Y RELACIÓN DE ASPECTO" android:textColor="#FFC107"
+                            android:textSize="11sp" android:textStyle="bold" android:layout_marginBottom="6dp" />
+                        <TextView android:layout_width="match_parent" android:layout_height="wrap_content"
+                            android:text="Proporción del área de juego" android:textColor="#C8D8E8" android:textSize="12sp" />
+                        <Spinner android:id="@+id/sp_aspect_ratio" android:layout_width="match_parent"
+                            android:layout_height="wrap_content" android:entries="@array/display_aspect_ratio_labels"
+                            android:layout_marginBottom="4dp" />
+                        <TextView android:id="@+id/tv_display_size_label" android:layout_width="wrap_content"
+                            android:layout_height="wrap_content" android:text="Tamaño del área de juego: 100%"
+                            android:textColor="#8B9BB4" android:textSize="11sp" />
+                        <SeekBar android:id="@+id/sb_display_size" android:layout_width="match_parent"
+                            android:layout_height="wrap_content" android:max="50" android:progress="50"
+                            android:progressTint="#FFD700" android:thumbTint="#FFC107" android:layout_marginBottom="6dp" />
+                        <TextView android:layout_width="match_parent" android:layout_height="wrap_content"
+                            android:text="Los cambios de pantalla requieren reiniciar la partida."
+                            android:textColor="#8B9BB4" android:textSize="10sp" />
+                    </LinearLayout>
+
                     <!-- Overlay Virtual -->
                     <LinearLayout
                         android:layout_width="match_parent"
@@ -559,6 +586,16 @@
                                 android:layout_weight="1" android:text="Mostrar controles en pantalla"
                                 android:textColor="#C8D8E8" android:textSize="12sp" android:layout_gravity="center_vertical" />
                             <CheckBox android:id="@+id/cb_show_overlay"
+                                android:layout_width="wrap_content" android:layout_height="wrap_content"
+                                android:buttonTint="#FFD700" />
+                        </LinearLayout>
+
+                        <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content"
+                            android:orientation="horizontal" android:layout_marginBottom="6dp">
+                            <TextView android:layout_width="0dp" android:layout_height="wrap_content"
+                                android:layout_weight="1" android:text="Editar posiciones (arrastra los controles)"
+                                android:textColor="#C8D8E8" android:textSize="12sp" android:layout_gravity="center_vertical" />
+                            <CheckBox android:id="@+id/cb_edit_control_positions"
                                 android:layout_width="wrap_content" android:layout_height="wrap_content"
                                 android:buttonTint="#FFD700" />
                         </LinearLayout>
