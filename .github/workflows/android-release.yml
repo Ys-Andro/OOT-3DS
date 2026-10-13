@@ -90,10 +90,10 @@ jobs:
               mv ./title-source/source/* ./title-source/
             fi
             echo "Shards extracted successfully."
-          elif [ "$GITHUB_EVENT_NAME" = "pull_request" ]; then
-            echo "::warning::source.zip is absent; PR validation may use a non-playable AOT stub, which is never publishable."
+          elif [ "$GITHUB_EVENT_NAME" = "pull_request" ] || { [ "$GITHUB_EVENT_NAME" = "workflow_dispatch" ] && [ "${{ inputs.publish_release }}" != "true" ]; }; then
+            echo "::warning::source.zip is absent; non-publishing validation may use a non-playable AOT stub."
           else
-            echo "::error::Refusing to build or publish a release without verified translated title sources (source.zip)."
+            echo "::error::Refusing a publishable build without verified translated title sources (source.zip)."
             exit 1
           fi
 
@@ -141,11 +141,11 @@ jobs:
 
           # A stub is allowed only for PR plumbing checks; never ship it as a release.
           if [ ! -f "build/title/libtriaevum_title_aot.so" ]; then
-            if [ "$GITHUB_EVENT_NAME" != "pull_request" ]; then
-              echo "::error::Refusing to package a release without the real whole-AOT title module."
+            if [ "$GITHUB_EVENT_NAME" != "pull_request" ] && { [ "$GITHUB_EVENT_NAME" != "workflow_dispatch" ] || [ "${{ inputs.publish_release }}" = "true" ]; }; then
+              echo "::error::Refusing to package a publishable build without the real whole-AOT title module."
               exit 1
             fi
-            echo "::warning::Using placeholder AOT stub for PR packaging checks only; this APK is not playable."
+            echo "::warning::Using placeholder AOT stub for non-publishing validation only; this APK is not playable."
             cat << 'EOF' > build/title_stub/triaevum_title_stub.c
             #include <stdint.h>
             __attribute__((visibility("default"))) uint32_t TriAevumTitlePluginVersion(void) { return 1; }
