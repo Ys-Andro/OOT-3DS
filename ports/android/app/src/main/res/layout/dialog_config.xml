@@ -557,6 +557,19 @@
                         <SeekBar android:id="@+id/sb_display_size" android:layout_width="match_parent"
                             android:layout_height="wrap_content" android:max="50" android:progress="50"
                             android:progressTint="#FFD700" android:thumbTint="#FFC107" android:layout_marginBottom="6dp" />
+                        <TextView android:id="@+id/tv_custom_width_label" android:layout_width="wrap_content"
+                            android:layout_height="wrap_content" android:text="Ancho personalizado: 100%"
+                            android:textColor="#8B9BB4" android:textSize="11sp" />
+                        <SeekBar android:id="@+id/sb_custom_width" android:layout_width="match_parent"
+                            android:layout_height="wrap_content" android:max="50" android:progress="50"
+                            android:progressTint="#FFD700" android:thumbTint="#FFC107" />
+                        <TextView android:id="@+id/tv_custom_height_label" android:layout_width="wrap_content"
+                            android:layout_height="wrap_content" android:text="Alto personalizado: 100%"
+                            android:textColor="#8B9BB4" android:textSize="11sp" />
+                        <SeekBar android:id="@+id/sb_custom_height" android:layout_width="match_parent"
+                            android:layout_height="wrap_content" android:max="50" android:progress="50"
+                            android:progressTint="#FFD700" android:thumbTint="#FFC107"
+                            android:layout_marginBottom="6dp" />
                         <TextView android:layout_width="match_parent" android:layout_height="wrap_content"
                             android:text="Los cambios de pantalla requieren reiniciar la partida."
                             android:textColor="#8B9BB4" android:textSize="10sp" />
