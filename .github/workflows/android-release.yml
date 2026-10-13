@@ -90,8 +90,11 @@ jobs:
               mv ./title-source/source/* ./title-source/
             fi
             echo "Shards extracted successfully."
+          elif [ "$GITHUB_EVENT_NAME" = "pull_request" ]; then
+            echo "::warning::source.zip is absent; PR validation may use a non-playable AOT stub, which is never publishable."
           else
-            echo "CRITICAL WARNING: source.zip not found in repo root. Building stub instead."
+            echo "::error::Refusing to build or publish a release without verified translated title sources (source.zip)."
+            exit 1
           fi
 
       - name: Build Android Native Runtime (ARM64)
@@ -136,9 +139,13 @@ jobs:
           LLVM_DIR="$ANDROID_NDK_ROOT/toolchains/llvm/prebuilt/linux-x86_64/bin"
           CLANG="$LLVM_DIR/aarch64-linux-android29-clang"
 
-          # Fallback stub strategy in case compilation step was skipped
+          # A stub is allowed only for PR plumbing checks; never ship it as a release.
           if [ ! -f "build/title/libtriaevum_title_aot.so" ]; then
-            echo "Using placeholder empty stub..."
+            if [ "$GITHUB_EVENT_NAME" != "pull_request" ]; then
+              echo "::error::Refusing to package a release without the real whole-AOT title module."
+              exit 1
+            fi
+            echo "::warning::Using placeholder AOT stub for PR packaging checks only; this APK is not playable."
             cat << 'EOF' > build/title_stub/triaevum_title_stub.c
             #include <stdint.h>
             __attribute__((visibility("default"))) uint32_t TriAevumTitlePluginVersion(void) { return 1; }
@@ -168,7 +175,7 @@ jobs:
             -PtriaevumNativeStage="$(pwd)/build/staged_native_libs" \
             --console=plain
 
-      - name: Package Release APK
+      - name: Package Android APK artifact
         run: |
           mkdir -p dist
           APK_SOURCE="ports/android/app/build/outputs/apk/debug/app-debug.apk"
