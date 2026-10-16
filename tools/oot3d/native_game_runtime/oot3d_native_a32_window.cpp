@@ -75,6 +75,7 @@
 
 #if defined(__ANDROID__)
 #include "android_host.h"
+#include "fast/backends/gfx_android.h"
 #endif
 
 #include "fast/Fast3dWindow.h"
@@ -4813,6 +4814,12 @@ void RunOot3dNativeA32Window(const Oot3dNativeGameLaunch &launch) {
       }
     }
     const auto presentationTime = std::chrono::steady_clock::now();
+#if defined(__ANDROID__)
+    if (Fast::GfxWindowBackendAndroid::ConsumeActivityResume()) {
+      // Don't simulate a backlog of frames that elapsed while Android paused us.
+      lastPresentationTime = presentationTime;
+    }
+#endif
     realtimePacer.ObservePresentation(presentationTime);
     const double presentationElapsedSeconds =
         hostArgs.FixedDeltaSeconds > 0.0

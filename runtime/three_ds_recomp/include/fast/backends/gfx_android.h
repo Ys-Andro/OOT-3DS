@@ -71,6 +71,11 @@ class GfxWindowBackendAndroid final : public GfxWindowBackend {
     // Call only after the native game loop and renderer have fully stopped.
     static void ReleaseNativeWindowsAfterRuntimeStopped();
     static bool IsSurfaceAvailable();
+    // Keep simulation/render pacing suspended while Activity is backgrounded.
+    static void NotifyActivityPaused();
+    static void NotifyActivityResumed();
+    // Consume once in the game loop to discard time accumulated while paused.
+    static bool ConsumeActivityResume();
 
   private:
     ANativeWindow* mNativeWindow = nullptr;

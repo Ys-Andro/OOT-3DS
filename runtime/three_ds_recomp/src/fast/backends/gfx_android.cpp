@@ -45,6 +45,8 @@ static uint32_t sGlobalWidth = 1280;
 static uint32_t sGlobalHeight = 720;
 static std::atomic<bool> sIsRunningGlobal{true};
 static std::atomic<bool> sSurfaceAvailable{false};
+static std::atomic<bool> sActivityPaused{false};
+static std::atomic<bool> sActivityResumePending{false};
 static std::atomic<bool> sRenderThreadWaiting{false};
 
 void GfxWindowBackendAndroid::NotifySurfaceCreated(ANativeWindow* window) {
@@ -113,6 +115,22 @@ void GfxWindowBackendAndroid::NotifySurfaceDestroyed() {
     } else {
         __android_log_print(ANDROID_LOG_WARN, "TriAevum", "NotifySurfaceDestroyed: render pause timed out; reference retained until safe surface recreation or runtime shutdown");
     }
+}
+
+void GfxWindowBackendAndroid::NotifyActivityPaused() {
+    sActivityPaused.store(true, std::memory_order_release);
+    sWindowCond.notify_all();
+}
+
+void GfxWindowBackendAndroid::NotifyActivityResumed() {
+    // Publish the resume edge before allowing the render thread to leave its wait.
+    sActivityResumePending.store(true, std::memory_order_release);
+    sActivityPaused.store(false, std::memory_order_release);
+    sWindowCond.notify_all();
+}
+
+bool GfxWindowBackendAndroid::ConsumeActivityResume() {
+    return sActivityResumePending.exchange(false, std::memory_order_acq_rel);
 }
 
 void GfxWindowBackendAndroid::SetGlobalNativeWindow(ANativeWindow* window) {
@@ -405,7 +423,8 @@ void GfxWindowBackendAndroid::RequestFocus() {}
 
 bool GfxWindowBackendAndroid::IsFrameReady() {
     std::unique_lock<std::mutex> lock(sWindowMutex);
-    while (!sSurfaceAvailable.load(std::memory_order_acquire) || sGlobalNativeWindow == nullptr) {
+    while (sActivityPaused.load(std::memory_order_acquire) ||
+           !sSurfaceAvailable.load(std::memory_order_acquire) || sGlobalNativeWindow == nullptr) {
         if (!sIsRunningGlobal.load(std::memory_order_relaxed)) {
             return false;
         }
@@ -414,7 +433,9 @@ bool GfxWindowBackendAndroid::IsFrameReady() {
 
         // Wait on condition variable while in background without burning CPU
         sWindowCond.wait(lock, [] {
-            return (sSurfaceAvailable.load(std::memory_order_acquire) && sGlobalNativeWindow != nullptr) ||
+            return (!sActivityPaused.load(std::memory_order_acquire) &&
+                    sSurfaceAvailable.load(std::memory_order_acquire) &&
+                    sGlobalNativeWindow != nullptr) ||
                    !sIsRunningGlobal.load(std::memory_order_relaxed);
         });
 

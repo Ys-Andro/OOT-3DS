@@ -347,13 +347,15 @@ Java_org_triaevum_android_TriAevumActivity_nativeSurfaceDestroyed(
 JNIEXPORT void JNICALL
 Java_org_triaevum_android_TriAevumActivity_nativeOnPause(
     JNIEnv * /*env*/, jclass /*clazz*/) {
-  __android_log_print(ANDROID_LOG_INFO, "TriAevum", "nativeOnPause");
+  __android_log_print(ANDROID_LOG_INFO, "TriAevum", "nativeOnPause: suspending native frame loop");
+  Fast::GfxWindowBackendAndroid::NotifyActivityPaused();
 }
 
 JNIEXPORT void JNICALL
 Java_org_triaevum_android_TriAevumActivity_nativeOnResume(
     JNIEnv * /*env*/, jclass /*clazz*/) {
-  __android_log_print(ANDROID_LOG_INFO, "TriAevum", "nativeOnResume");
+  __android_log_print(ANDROID_LOG_INFO, "TriAevum", "nativeOnResume: resuming native frame loop");
+  Fast::GfxWindowBackendAndroid::NotifyActivityResumed();
 }
 
 JNIEXPORT void JNICALL
