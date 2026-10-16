@@ -170,21 +170,73 @@ jobs:
             --ndk "$ANDROID_NDK_ROOT" \
             --output build/staged_native_libs
 
+      - name: Configure stable Android release signing
+        id: signing
+        env:
+          ANDROID_RELEASE_KEYSTORE_BASE64: ${{ secrets.TRIAEVUM_RELEASE_KEYSTORE_BASE64 }}
+          ANDROID_RELEASE_STORE_PASSWORD: ${{ secrets.TRIAEVUM_RELEASE_STORE_PASSWORD }}
+          ANDROID_RELEASE_KEY_ALIAS: ${{ secrets.TRIAEVUM_RELEASE_KEY_ALIAS }}
+          ANDROID_RELEASE_KEY_PASSWORD: ${{ secrets.TRIAEVUM_RELEASE_KEY_PASSWORD }}
+        run: |
+          values=(
+            "$ANDROID_RELEASE_KEYSTORE_BASE64"
+            "$ANDROID_RELEASE_STORE_PASSWORD"
+            "$ANDROID_RELEASE_KEY_ALIAS"
+            "$ANDROID_RELEASE_KEY_PASSWORD"
+          )
+          present=0
+          for value in "${values[@]}"; do
+            if [ -n "$value" ]; then present=$((present + 1)); fi
+          done
+          if [ "$present" -eq 4 ]; then
+            key_dir="$RUNNER_TEMP/triaevum-release-signing"
+            mkdir -p "$key_dir"
+            key_file="$key_dir/release.jks"
+            printf '%s' "$ANDROID_RELEASE_KEYSTORE_BASE64" | base64 --decode > "$key_file"
+            chmod 600 "$key_file"
+            keytool -list -keystore "$key_file" -storepass "$ANDROID_RELEASE_STORE_PASSWORD" -alias "$ANDROID_RELEASE_KEY_ALIAS" >/dev/null
+            echo "TRIAEVUM_RELEASE_KEYSTORE_PATH=$key_file" >> "$GITHUB_ENV"
+            echo "TRIAEVUM_RELEASE_STORE_PASSWORD=$ANDROID_RELEASE_STORE_PASSWORD" >> "$GITHUB_ENV"
+            echo "TRIAEVUM_RELEASE_KEY_ALIAS=$ANDROID_RELEASE_KEY_ALIAS" >> "$GITHUB_ENV"
+            echo "TRIAEVUM_RELEASE_KEY_PASSWORD=$ANDROID_RELEASE_KEY_PASSWORD" >> "$GITHUB_ENV"
+            echo "enabled=true" >> "$GITHUB_OUTPUT"
+            echo "Stable release signing configured."
+          elif [ "$present" -eq 0 ]; then
+            echo "enabled=false" >> "$GITHUB_OUTPUT"
+            echo "::warning::Stable signing secrets are not configured. A debug-signed validation APK will be uploaded as an artifact, but no GitHub Release will be published."
+          else
+            echo "::error::Release signing is partially configured. Set all four TRIAEVUM_RELEASE_* secrets."
+            exit 1
+          fi
+
       - name: Build Android Controls & APK
         run: |
           chmod +x ports/android/gradlew
           ports/android/gradlew -p ports/android :controls:assembleDebug :controls:testDebugUnitTest --console=plain
-          ports/android/gradlew -p ports/android :app:assembleDebug \
-            -PtriaevumSdlSource="$(pwd)/build/runtime/_deps/sdl2-src" \
-            -PtriaevumNativeStage="$(pwd)/build/staged_native_libs" \
-            -PtriaevumVersionCode="$GITHUB_RUN_NUMBER" \
-            -PtriaevumVersionName="0.1.$GITHUB_RUN_NUMBER" \
-            --console=plain
+          if [ "${{ steps.signing.outputs.enabled }}" = "true" ]; then
+            ports/android/gradlew -p ports/android :app:assembleRelease \
+              -PtriaevumSdlSource="$(pwd)/build/runtime/_deps/sdl2-src" \
+              -PtriaevumNativeStage="$(pwd)/build/staged_native_libs" \
+              -PtriaevumVersionCode="$GITHUB_RUN_NUMBER" \
+              -PtriaevumVersionName="0.1.$GITHUB_RUN_NUMBER" \
+              --console=plain
+          else
+            ports/android/gradlew -p ports/android :app:assembleDebug \
+              -PtriaevumSdlSource="$(pwd)/build/runtime/_deps/sdl2-src" \
+              -PtriaevumNativeStage="$(pwd)/build/staged_native_libs" \
+              -PtriaevumVersionCode="$GITHUB_RUN_NUMBER" \
+              -PtriaevumVersionName="0.1.$GITHUB_RUN_NUMBER" \
+              --console=plain
+          fi
 
       - name: Package Android APK artifact
         run: |
           mkdir -p dist
-          APK_SOURCE="ports/android/app/build/outputs/apk/debug/app-debug.apk"
+          if [ "${{ steps.signing.outputs.enabled }}" = "true" ]; then
+            APK_SOURCE="ports/android/app/build/outputs/apk/release/app-release.apk"
+          else
+            APK_SOURCE="ports/android/app/build/outputs/apk/debug/app-debug.apk"
+          fi
           if [ -f "$APK_SOURCE" ]; then
             cp "$APK_SOURCE" "dist/TriAevum-Oot3D-Android-arm64-v8a.apk"
             ls -lh dist/TriAevum-Oot3D-Android-arm64-v8a.apk
@@ -202,7 +254,7 @@ jobs:
 
       - name: Determine Release Tag
         id: release_info
-        if: startsWith(github.ref, 'refs/tags/v') || (github.event_name == 'workflow_dispatch' && inputs.publish_release) || (github.event_name == 'push' && github.ref == 'refs/heads/main')
+        if: (startsWith(github.ref, 'refs/tags/v') || (github.event_name == 'workflow_dispatch' && inputs.publish_release) || (github.event_name == 'push' && github.ref == 'refs/heads/main')) && steps.signing.outputs.enabled == 'true'
         run: |
           if [ -n "${{ github.event.inputs.release_tag }}" ]; then
             TAG="${{ github.event.inputs.release_tag }}"
@@ -215,7 +267,7 @@ jobs:
 
       - name: Publish GitHub Release
         uses: softprops/action-gh-release@v2
-        if: startsWith(github.ref, 'refs/tags/v') || (github.event_name == 'workflow_dispatch' && inputs.publish_release) || (github.event_name == 'push' && github.ref == 'refs/heads/main')
+        if: (startsWith(github.ref, 'refs/tags/v') || (github.event_name == 'workflow_dispatch' && inputs.publish_release) || (github.event_name == 'push' && github.ref == 'refs/heads/main')) && steps.signing.outputs.enabled == 'true'
         with:
           tag_name: ${{ steps.release_info.outputs.tag }}
           name: ${{ steps.release_info.outputs.tag }}

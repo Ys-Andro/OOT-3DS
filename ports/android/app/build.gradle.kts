@@ -14,6 +14,12 @@ dependencies {
 val nativeStage = providers.gradleProperty("triaevumNativeStage")
 val triaevumVersionCode = providers.gradleProperty("triaevumVersionCode").orNull?.toIntOrNull() ?: 1
 val triaevumVersionName = providers.gradleProperty("triaevumVersionName").orElse("0.1-intro-dev").get()
+val releaseKeystorePath = providers.environmentVariable("TRIAEVUM_RELEASE_KEYSTORE_PATH").orNull
+val releaseStorePassword = providers.environmentVariable("TRIAEVUM_RELEASE_STORE_PASSWORD").orNull
+val releaseKeyAlias = providers.environmentVariable("TRIAEVUM_RELEASE_KEY_ALIAS").orNull
+val releaseKeyPassword = providers.environmentVariable("TRIAEVUM_RELEASE_KEY_PASSWORD").orNull
+val releaseSigningAvailable = listOf(releaseKeystorePath, releaseStorePassword, releaseKeyAlias, releaseKeyPassword)
+    .all { !it.isNullOrBlank() }
 android {
     namespace = "org.triaevum.android"
     compileSdk = 35
@@ -34,6 +40,24 @@ android {
     }
     sourceSets.getByName("main") {
         if (nativeStage.isPresent) jniLibs.srcDir(nativeStage.get())
+    }
+    signingConfigs {
+        if (releaseSigningAvailable) {
+            create("triaevumRelease") {
+                storeFile = file(requireNotNull(releaseKeystorePath))
+                storePassword = requireNotNull(releaseStorePassword)
+                keyAlias = requireNotNull(releaseKeyAlias)
+                keyPassword = requireNotNull(releaseKeyPassword)
+            }
+        }
+    }
+    buildTypes {
+        getByName("release") {
+            isMinifyEnabled = false
+            if (releaseSigningAvailable) {
+                signingConfig = signingConfigs.getByName("triaevumRelease")
+            }
+        }
     }
     packaging { jniLibs.useLegacyPackaging = true }
     androidResources {
