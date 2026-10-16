@@ -48,6 +48,11 @@ on:
 permissions:
   contents: write
 
+# A main-branch update supersedes an older in-flight main build.
+concurrency:
+  group: android-release-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   build-and-release:
     runs-on: ubuntu-24.04
@@ -252,9 +257,21 @@ jobs:
           path: dist/TriAevum-Oot3D-Android-arm64-v8a.apk
           if-no-files-found: error
 
+      - name: Confirm main branch has not moved
+        id: freshness
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        run: |
+          current_main="$(git ls-remote origin refs/heads/main | cut -f1)"
+          if [ "$current_main" != "$GITHUB_SHA" ]; then
+            echo "is_current=false" >> "$GITHUB_OUTPUT"
+            echo "::warning::Skipping release from stale commit $GITHUB_SHA; main is now $current_main."
+          else
+            echo "is_current=true" >> "$GITHUB_OUTPUT"
+          fi
+
       - name: Determine Release Tag
         id: release_info
-        if: (startsWith(github.ref, 'refs/tags/v') || (github.event_name == 'workflow_dispatch' && inputs.publish_release) || (github.event_name == 'push' && github.ref == 'refs/heads/main')) && steps.signing.outputs.enabled == 'true'
+        if: (startsWith(github.ref, 'refs/tags/v') || (github.event_name == 'workflow_dispatch' && inputs.publish_release) || (github.event_name == 'push' && github.ref == 'refs/heads/main')) && steps.signing.outputs.enabled == 'true' && steps.freshness.outputs.is_current != 'false' && steps.freshness.outputs.is_current != 'false'
         run: |
           if [ -n "${{ github.event.inputs.release_tag }}" ]; then
             TAG="${{ github.event.inputs.release_tag }}"
@@ -270,6 +287,7 @@ jobs:
         if: (startsWith(github.ref, 'refs/tags/v') || (github.event_name == 'workflow_dispatch' && inputs.publish_release) || (github.event_name == 'push' && github.ref == 'refs/heads/main')) && steps.signing.outputs.enabled == 'true'
         with:
           tag_name: ${{ steps.release_info.outputs.tag }}
+          target_commitish: ${{ github.sha }}
           name: ${{ steps.release_info.outputs.tag }}
           prerelease: ${{ github.event_name == 'workflow_dispatch' && inputs.prerelease || contains(steps.release_info.outputs.tag, 'alpha') || contains(steps.release_info.outputs.tag, 'beta') }}
           files: dist/TriAevum-Oot3D-Android-arm64-v8a.apk
