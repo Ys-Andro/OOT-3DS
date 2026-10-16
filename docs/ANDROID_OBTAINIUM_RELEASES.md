@@ -34,3 +34,16 @@ Older APKs published by the previous workflow were built as Debug variants on fr
 ## Scope of validation
 
 A release workflow passing means the source checks, ARM64 native build, title module build, Android package build, and configured signing steps passed. It does not establish that the game is fully playable on every Android device. Device qualification still needs direct launch, gameplay/input, audio, save/reload, pause/resume, renderer lifecycle, and performance tests.
+
+## Historical release warning (2026-10-16)
+
+The legacy run [#24](https://github.com/Ys-Andro/OOT-3DS/actions/runs/38963258537)
+built commit `a5853c1addbddefcf2869735d2a84f9a4b5d95e4` using
+`assembleDebug`, then published asset `v0.1.24`. The release tag now resolves
+to a later commit, `04b553fc08bfb36969027b997173025877e9a82c`, because the old
+workflow did not pin a newly created tag to the build's source SHA. Consequently,
+the APK asset and tag metadata do not identify the same source revision. This
+is a legacy release, not proof that all newer Android changes were built into it.
+Do not treat that asset as the build for its current tag, and do not use it as
+a production Obtainium update channel. The current workflow now pins release tags
+to `github.sha` and skips publishing when a main-branch build is stale.
