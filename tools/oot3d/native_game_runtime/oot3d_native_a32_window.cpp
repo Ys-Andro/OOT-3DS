@@ -6292,13 +6292,13 @@ void RunOot3dNativeA32Window(const Oot3dNativeGameLaunch &launch) {
       ++benchmarkMeasuredFrames;
     }
     if (quickLoadRequested) {
-      if (quickSavePending && androidQuickSaveCommandPending) {
 #if defined(__ANDROID__)
+      if (quickSavePending && androidQuickSaveCommandPending) {
         androidStateCommands.quickStateStatus.store(
             AndroidQuickStateStatus::Failed, std::memory_order_release);
         androidQuickSaveCommandPending = false;
-#endif
       }
+#endif
       quickSavePending = false;
       const bool loaded = loadState(quickStatePath);
 #if defined(__ANDROID__)
