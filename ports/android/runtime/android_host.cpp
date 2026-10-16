@@ -112,6 +112,13 @@ void ShutdownAndroidGameHost() {
   state.touchPressed.store(false, std::memory_order_relaxed);
   state.touchX.store(0.0f, std::memory_order_relaxed);
   state.touchY.store(0.0f, std::memory_order_relaxed);
+  state.quickSaveRequested.store(false, std::memory_order_relaxed);
+  state.quickLoadRequested.store(false, std::memory_order_relaxed);
+  const auto quickStatus = state.quickStateStatus.load(std::memory_order_acquire);
+  if (quickStatus == AndroidQuickStateStatus::Saving ||
+      quickStatus == AndroidQuickStateStatus::Loading) {
+    state.quickStateStatus.store(AndroidQuickStateStatus::Failed, std::memory_order_release);
+  }
 
   // Called only after RunOot3dNativeGameMain returns, after renderer/context
   // destruction. Retained ANativeWindow references are safe to release now.
@@ -119,7 +126,50 @@ void ShutdownAndroidGameHost() {
   Fast::GfxWindowBackendAndroid::ReleaseNativeWindowsAfterRuntimeStopped();
 }
 
+static bool RequestAndroidQuickStateCommand(bool save) {
+  auto &state = GetAndroidOverlayInputState();
+  const auto requestedStatus = save
+      ? AndroidQuickStateStatus::Saving
+      : AndroidQuickStateStatus::Loading;
+  auto observed = state.quickStateStatus.load(std::memory_order_acquire);
+  for (;;) {
+    if (observed == AndroidQuickStateStatus::Saving ||
+        observed == AndroidQuickStateStatus::Loading) {
+      return false;
+    }
+    if (state.quickStateStatus.compare_exchange_weak(
+            observed, requestedStatus, std::memory_order_acq_rel,
+            std::memory_order_acquire)) {
+      if (save) {
+        state.quickSaveRequested.store(true, std::memory_order_release);
+      } else {
+        state.quickLoadRequested.store(true, std::memory_order_release);
+      }
+      return true;
+    }
+  }
+}
+
 extern "C" {
+
+JNIEXPORT jboolean JNICALL
+Java_org_triaevum_android_TriAevumActivity_nativeRequestQuickSave(
+    JNIEnv * /*env*/, jclass /*clazz*/) {
+  return RequestAndroidQuickStateCommand(true) ? JNI_TRUE : JNI_FALSE;
+}
+
+JNIEXPORT jboolean JNICALL
+Java_org_triaevum_android_TriAevumActivity_nativeRequestQuickLoad(
+    JNIEnv * /*env*/, jclass /*clazz*/) {
+  return RequestAndroidQuickStateCommand(false) ? JNI_TRUE : JNI_FALSE;
+}
+
+JNIEXPORT jint JNICALL
+Java_org_triaevum_android_TriAevumActivity_nativeGetQuickStateStatus(
+    JNIEnv * /*env*/, jclass /*clazz*/) {
+  return static_cast<jint>(GetAndroidOverlayInputState().quickStateStatus.load(
+      std::memory_order_acquire));
+}
 
 JNIEXPORT void JNICALL
 Java_org_triaevum_android_AndroidNativeInputTarget_nativeButton(
@@ -224,6 +274,10 @@ Java_org_triaevum_android_TriAevumActivity_nativeSetGameVolume(
 JNIEXPORT void JNICALL
 Java_org_triaevum_android_TriAevumActivity_nativePrepareSession(
     JNIEnv * /*env*/, jclass /*clazz*/) {
+  auto &state = GetAndroidOverlayInputState();
+  state.quickSaveRequested.store(false, std::memory_order_relaxed);
+  state.quickLoadRequested.store(false, std::memory_order_relaxed);
+  state.quickStateStatus.store(AndroidQuickStateStatus::Idle, std::memory_order_release);
   Ship::ShutdownRequest::Reset();
   Fast::GfxWindowBackendAndroid::ResetStop();
 }

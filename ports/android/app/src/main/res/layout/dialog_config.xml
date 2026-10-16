@@ -281,6 +281,70 @@
                             android:contentDescription="Volumen independiente del juego" />
                     </LinearLayout>
 
+                    <!-- Native runtime save state -->
+                    <LinearLayout
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:background="@drawable/card_bg"
+                        android:orientation="vertical"
+                        android:padding="12dp"
+                        android:layout_marginBottom="8dp">
+
+                        <TextView
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:text="GUARDADO Y CARGA RÁPIDOS"
+                            android:textColor="#FFC107"
+                            android:textSize="11sp"
+                            android:textStyle="bold"
+                            android:layout_marginBottom="6dp" />
+
+                        <TextView
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:text="Captura el estado del runtime, no solo la partida normal. Puede tardar y ocupar bastante espacio."
+                            android:textColor="#8B9BB4"
+                            android:textSize="10sp"
+                            android:layout_marginBottom="8dp" />
+
+                        <TextView
+                            android:id="@+id/tv_quick_state_status"
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:text="Ranura rápida: quick.oot3dsav"
+                            android:textColor="#E6ECF5"
+                            android:textSize="11sp"
+                            android:layout_marginBottom="8dp" />
+
+                        <LinearLayout
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:orientation="horizontal">
+
+                            <Button
+                                android:id="@+id/btn_quick_save_state"
+                                android:layout_width="0dp"
+                                android:layout_height="42dp"
+                                android:layout_weight="1"
+                                android:layout_marginEnd="4dp"
+                                android:background="@drawable/btn_dark"
+                                android:text="Guardar rápido"
+                                android:textColor="#FFD700"
+                                android:textSize="11sp" />
+
+                            <Button
+                                android:id="@+id/btn_quick_load_state"
+                                android:layout_width="0dp"
+                                android:layout_height="42dp"
+                                android:layout_weight="1"
+                                android:layout_marginStart="4dp"
+                                android:background="@drawable/btn_dark"
+                                android:text="Cargar rápido"
+                                android:textColor="#E6ECF5"
+                                android:textSize="11sp" />
+                        </LinearLayout>
+                    </LinearLayout>
+
                 </LinearLayout>
             </ScrollView>
 

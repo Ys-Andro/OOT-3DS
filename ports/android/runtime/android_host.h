@@ -5,6 +5,15 @@
 #include <memory>
 #include <string>
 
+enum class AndroidQuickStateStatus : int32_t {
+  Failed = -1,
+  Idle = 0,
+  Saving = 1,
+  Saved = 2,
+  Loading = 3,
+  Loaded = 4,
+};
+
 struct AndroidOverlayInputState {
   std::atomic<uint32_t> buttons{0};
   std::atomic<float> circlePadX{0.0f};
@@ -16,6 +25,9 @@ struct AndroidOverlayInputState {
   std::atomic<bool> touchPressed{false};
   std::atomic<bool> touchEnabled{false};
   std::atomic<bool> swapScreens{false};
+  std::atomic<bool> quickSaveRequested{false};
+  std::atomic<bool> quickLoadRequested{false};
+  std::atomic<AndroidQuickStateStatus> quickStateStatus{AndroidQuickStateStatus::Idle};
 };
 
 namespace Oot3dNativeGame {

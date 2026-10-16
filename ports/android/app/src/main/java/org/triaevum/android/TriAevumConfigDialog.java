@@ -6,6 +6,8 @@ import android.content.Context;
 import android.content.SharedPreferences;
 import android.graphics.Color;
 import android.os.Bundle;
+import android.os.Handler;
+import android.os.Looper;
 import android.util.Log;
 import android.view.View;
 import android.view.ViewGroup;
@@ -52,6 +54,15 @@ public final class TriAevumConfigDialog extends Dialog {
     private Spinner mSpSurfaceRes;
     private SeekBar mSbGameVolume;
     private TextView mTvGameVolumeLabel;
+    private Button mBtnQuickSaveState, mBtnQuickLoadState;
+    private TextView mTvQuickStateStatus;
+    private final Handler mQuickStateHandler = new Handler(Looper.getMainLooper());
+    private final Runnable mQuickStateStatusPoller = new Runnable() {
+        @Override public void run() {
+            updateQuickStateStatus();
+            if (isShowing()) mQuickStateHandler.postDelayed(this, 250L);
+        }
+    };
 
     // Gráficos
     private Spinner mSpRenderScale;
@@ -104,6 +115,20 @@ public final class TriAevumConfigDialog extends Dialog {
     }
 
     @Override
+    protected void onStart() {
+        super.onStart();
+        updateQuickStateStatus();
+        mQuickStateHandler.removeCallbacks(mQuickStateStatusPoller);
+        mQuickStateHandler.postDelayed(mQuickStateStatusPoller, 250L);
+    }
+
+    @Override
+    protected void onStop() {
+        mQuickStateHandler.removeCallbacks(mQuickStateStatusPoller);
+        super.onStop();
+    }
+
+    @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
 
@@ -152,6 +177,9 @@ public final class TriAevumConfigDialog extends Dialog {
         mSpSurfaceRes = findViewById(R.id.sp_surface_resolution);
         mSbGameVolume = findViewById(R.id.sb_game_volume);
         mTvGameVolumeLabel = findViewById(R.id.tv_game_volume_label);
+        mBtnQuickSaveState = findViewById(R.id.btn_quick_save_state);
+        mBtnQuickLoadState = findViewById(R.id.btn_quick_load_state);
+        mTvQuickStateStatus = findViewById(R.id.tv_quick_state_status);
 
         // Gráficos
         mSpRenderScale    = findViewById(R.id.sp_render_scale);
@@ -505,6 +533,34 @@ public final class TriAevumConfigDialog extends Dialog {
 
         btnClose.setOnClickListener(v -> dismiss());
 
+        mBtnQuickSaveState.setOnClickListener(v -> {
+            try {
+                if (TriAevumActivity.nativeRequestQuickSave()) {
+                    updateQuickStateStatus();
+                } else {
+                    Toast.makeText(getContext(),
+                        "Hay otra operación de estado rápido en curso.", Toast.LENGTH_SHORT).show();
+                }
+            } catch (Throwable error) {
+                Log.e(TAG, "Quick-save request failed", error);
+                Toast.makeText(getContext(), "No se pudo solicitar el guardado rápido.", Toast.LENGTH_LONG).show();
+            }
+        });
+
+        mBtnQuickLoadState.setOnClickListener(v -> {
+            try {
+                if (TriAevumActivity.nativeRequestQuickLoad()) {
+                    updateQuickStateStatus();
+                } else {
+                    Toast.makeText(getContext(),
+                        "Hay otra operación de estado rápido en curso.", Toast.LENGTH_SHORT).show();
+                }
+            } catch (Throwable error) {
+                Log.e(TAG, "Quick-load request failed", error);
+                Toast.makeText(getContext(), "No se pudo solicitar la carga rápida.", Toast.LENGTH_LONG).show();
+            }
+        });
+
         btnRestore.setOnClickListener(v -> {
             mConfig.restoreDefaults();
             mConfig.applyLiveSettings();
@@ -543,6 +599,31 @@ public final class TriAevumConfigDialog extends Dialog {
             loadFromConfig();
             Toast.makeText(getContext(), "Valores predeterminados restaurados. Reinicia el juego para aplicar FPS y resolución.", Toast.LENGTH_LONG).show();
         });
+    }
+
+    private void updateQuickStateStatus() {
+        if (mTvQuickStateStatus == null) return;
+        try {
+            int status = TriAevumActivity.nativeGetQuickStateStatus();
+            String message;
+            switch (status) {
+                case 1: message = "Guardando estado rápido…"; break;
+                case 2: message = "Estado guardado en quick.oot3dsav."; break;
+                case 3: message = "Cargando estado rápido…"; break;
+                case 4: message = "Estado cargado."; break;
+                case -1: message = "Falló la operación. Revisa logs/native-stderr.log."; break;
+                default: message = "Ranura rápida: quick.oot3dsav";
+            }
+            mTvQuickStateStatus.setText(message);
+            boolean busy = status == 1 || status == 3;
+            mBtnQuickSaveState.setEnabled(!busy);
+            mBtnQuickLoadState.setEnabled(!busy);
+        } catch (Throwable error) {
+            mTvQuickStateStatus.setText("Estado rápido no disponible.");
+            mBtnQuickSaveState.setEnabled(false);
+            mBtnQuickLoadState.setEnabled(false);
+            Log.w(TAG, "Could not query quick-state status", error);
+        }
     }
 
     // -------------------------------------------------------------------------

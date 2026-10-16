@@ -4495,6 +4495,10 @@ void RunOot3dNativeA32Window(const Oot3dNativeGameLaunch &launch) {
   bool quickSaveKeyWasDown = false;
   bool quickLoadKeyWasDown = false;
   bool quickSavePending = false;
+#if defined(__ANDROID__)
+  bool androidQuickSaveCommandPending = false;
+  bool androidQuickLoadCommandPending = false;
+#endif
   bool automatedStateSaved = false;
   std::optional<uint32_t> automatedStateSavedAtRunFrame;
   std::optional<uint32_t> automatedStateSavedAtGuestFrame;
@@ -4841,9 +4845,25 @@ void RunOot3dNativeA32Window(const Oot3dNativeGameLaunch &launch) {
     const auto inputPhaseStart = std::chrono::steady_clock::now();
     const bool quickSaveKeyDown = window.IsKeyDown(Ship::KbScancode::LUS_KB_F5);
     const bool quickLoadKeyDown = window.IsKeyDown(Ship::KbScancode::LUS_KB_F8);
+#if defined(__ANDROID__)
+    auto &androidStateCommands = GetAndroidOverlayInputState();
+    const bool androidQuickSaveRequested = androidStateCommands.quickSaveRequested.exchange(
+        false, std::memory_order_acq_rel);
+    const bool androidQuickLoadRequested = androidStateCommands.quickLoadRequested.exchange(
+        false, std::memory_order_acq_rel);
+    androidQuickSaveCommandPending =
+        androidQuickSaveCommandPending || androidQuickSaveRequested;
+    androidQuickLoadCommandPending =
+        androidQuickLoadCommandPending || androidQuickLoadRequested;
+#else
+    const bool androidQuickSaveRequested = false;
+    const bool androidQuickLoadRequested = false;
+#endif
     quickSavePending =
-        quickSavePending || (quickSaveKeyDown && !quickSaveKeyWasDown);
-    const bool quickLoadRequested = quickLoadKeyDown && !quickLoadKeyWasDown;
+        quickSavePending || (quickSaveKeyDown && !quickSaveKeyWasDown) ||
+        androidQuickSaveRequested;
+    const bool quickLoadRequested =
+        (quickLoadKeyDown && !quickLoadKeyWasDown) || androidQuickLoadRequested;
     quickSaveKeyWasDown = quickSaveKeyDown;
     quickLoadKeyWasDown = quickLoadKeyDown;
     bool nativeFrontendTouchEnabled = ResolveNativeA32TouchInputEnabled(
@@ -6272,12 +6292,46 @@ void RunOot3dNativeA32Window(const Oot3dNativeGameLaunch &launch) {
       ++benchmarkMeasuredFrames;
     }
     if (quickLoadRequested) {
-      if (loadState(quickStatePath)) {
-        quickSavePending = false;
+      if (quickSavePending && androidQuickSaveCommandPending) {
+#if defined(__ANDROID__)
+        androidStateCommands.quickStateStatus.store(
+            AndroidQuickStateStatus::Failed, std::memory_order_release);
+        androidQuickSaveCommandPending = false;
+#endif
       }
+      quickSavePending = false;
+      const bool loaded = loadState(quickStatePath);
+#if defined(__ANDROID__)
+      if (androidQuickLoadCommandPending) {
+        androidStateCommands.quickStateStatus.store(
+            loaded ? AndroidQuickStateStatus::Loaded : AndroidQuickStateStatus::Failed,
+            std::memory_order_release);
+        androidQuickLoadCommandPending = false;
+      }
+#endif
     } else {
-      if (quickSavePending && saveState(quickStatePath)) {
-        quickSavePending = false;
+      if (quickSavePending) {
+        const bool saveDeferred = ocarinaText.Pending();
+        const bool saved = saveState(quickStatePath);
+        if (saved) {
+          quickSavePending = false;
+#if defined(__ANDROID__)
+          if (androidQuickSaveCommandPending) {
+            androidStateCommands.quickStateStatus.store(
+                AndroidQuickStateStatus::Saved, std::memory_order_release);
+            androidQuickSaveCommandPending = false;
+          }
+#endif
+        } else if (!saveDeferred) {
+          quickSavePending = false;
+#if defined(__ANDROID__)
+          if (androidQuickSaveCommandPending) {
+            androidStateCommands.quickStateStatus.store(
+                AndroidQuickStateStatus::Failed, std::memory_order_release);
+            androidQuickSaveCommandPending = false;
+          }
+#endif
+        }
       }
       if (Oot3dNativeGame::ShouldCaptureNativeA32AutomatedState(
               launch.SaveStateFrameAvailable, automatedStateSaved,

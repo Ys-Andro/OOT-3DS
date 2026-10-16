@@ -38,6 +38,9 @@ public final class TriAevumActivity extends Activity {
     // JNI Native bindings
     public static native void nativeSetStoragePath(String path);
     public static native void nativeSetGameVolume(int percent);
+    public static native boolean nativeRequestQuickSave();
+    public static native boolean nativeRequestQuickLoad();
+    public static native int nativeGetQuickStateStatus();
     public static native void nativePrepareSession();
     public static native void nativeRequestShutdown();
     public static native void nativeShutdownIdleHost();
