@@ -141,7 +141,9 @@ public class WindroidVirtualControllerView extends View {
 
     public void resetCustomLayout() {
         if (preferences != null) {
-            SharedPreferences.Editor e = preferences.edit().putBoolean("VC_CUSTOM_USER_SAVED", false);
+            SharedPreferences.Editor e = preferences.edit()
+                .putBoolean("VC_CUSTOM_USER_SAVED", false)
+                .remove("VC_CUSTOM_LAYOUT_VERSION");
             for (VirtualControllerButton btn : buttonList) {
                 e.remove("VC_BUTTON_" + btn.id + "_X").remove("VC_BUTTON_" + btn.id + "_Y");
             }
@@ -155,17 +157,23 @@ public class WindroidVirtualControllerView extends View {
 
     private void saveEditedLayout() {
         if (preferences == null) return;
-        SharedPreferences.Editor e = preferences.edit().putBoolean("VC_CUSTOM_USER_SAVED", true);
+        float layoutWidth = Math.max(1F, getWidth());
+        float layoutHeight = Math.max(1F, getHeight());
+        SharedPreferences.Editor e = preferences.edit()
+            .putBoolean("VC_CUSTOM_USER_SAVED", true)
+            .putInt("VC_CUSTOM_LAYOUT_VERSION", ControlLayoutPolicy.NORMALIZED_LAYOUT_VERSION);
+        // Store normalized positions so user layouts survive resolution and
+        // orientation changes instead of remaining at old absolute pixel offsets.
         for (VirtualControllerButton btn : buttonList) {
-            e.putFloat("VC_BUTTON_" + btn.id + "_X", btn.x)
-             .putFloat("VC_BUTTON_" + btn.id + "_Y", btn.y);
+            e.putFloat("VC_BUTTON_" + btn.id + "_X", ControlLayoutPolicy.encodeCoordinate(btn.x, layoutWidth))
+             .putFloat("VC_BUTTON_" + btn.id + "_Y", ControlLayoutPolicy.encodeCoordinate(btn.y, layoutHeight));
         }
-        e.putFloat("VC_BUTTON_" + LEFT_ANALOG + "_X", leftAnalog.x)
-         .putFloat("VC_BUTTON_" + LEFT_ANALOG + "_Y", leftAnalog.y)
-         .putFloat("VC_BUTTON_" + RIGHT_ANALOG + "_X", rightAnalog.x)
-         .putFloat("VC_BUTTON_" + RIGHT_ANALOG + "_Y", rightAnalog.y)
-         .putFloat("VC_BUTTON_DPAD_X", dpad.x)
-         .putFloat("VC_BUTTON_DPAD_Y", dpad.y)
+        e.putFloat("VC_BUTTON_" + LEFT_ANALOG + "_X", ControlLayoutPolicy.encodeCoordinate(leftAnalog.x, layoutWidth))
+         .putFloat("VC_BUTTON_" + LEFT_ANALOG + "_Y", ControlLayoutPolicy.encodeCoordinate(leftAnalog.y, layoutHeight))
+         .putFloat("VC_BUTTON_" + RIGHT_ANALOG + "_X", ControlLayoutPolicy.encodeCoordinate(rightAnalog.x, layoutWidth))
+         .putFloat("VC_BUTTON_" + RIGHT_ANALOG + "_Y", ControlLayoutPolicy.encodeCoordinate(rightAnalog.y, layoutHeight))
+         .putFloat("VC_BUTTON_DPAD_X", ControlLayoutPolicy.encodeCoordinate(dpad.x, layoutWidth))
+         .putFloat("VC_BUTTON_DPAD_Y", ControlLayoutPolicy.encodeCoordinate(dpad.y, layoutHeight))
          .apply();
     }
 
@@ -430,25 +438,49 @@ public class WindroidVirtualControllerView extends View {
         mSettingsGearPaint.setStrokeWidth(6F * scaleFactor);
         mSettingsTextPaint.setTextSize(mSettingsBtnRadius * 0.9F);
 
-        // Allow saved user preferences only if layout was explicitly saved by user
+        // Version 2 stores normalized coordinates. Legacy unversioned layouts
+        // remain readable as pixels and are clamped so controls cannot be lost
+        // entirely outside a differently sized display.
         if (preferences != null && preferences.getBoolean("VC_CUSTOM_USER_SAVED", false)) {
+            boolean normalized = preferences.getInt("VC_CUSTOM_LAYOUT_VERSION", 0)
+                >= ControlLayoutPolicy.NORMALIZED_LAYOUT_VERSION;
             for (VirtualControllerButton i : buttonList) {
-                if (preferences.contains("VC_BUTTON_" + i.id + "_X")) {
-                    i.x = preferences.getFloat("VC_BUTTON_" + i.id + "_X", i.x);
-                    i.y = preferences.getFloat("VC_BUTTON_" + i.id + "_Y", i.y);
+                String xKey = "VC_BUTTON_" + i.id + "_X";
+                String yKey = "VC_BUTTON_" + i.id + "_Y";
+                if (preferences.contains(xKey) && preferences.contains(yKey)) {
+                    i.x = ControlLayoutPolicy.decodeCoordinate(
+                        preferences.getFloat(xKey, normalized ? 0.5F : i.x),
+                        width, normalized, i.radius);
+                    i.y = ControlLayoutPolicy.decodeCoordinate(
+                        preferences.getFloat(yKey, normalized ? 0.5F : i.y),
+                        height, normalized, i.radius);
                 }
             }
-            if (preferences.contains("VC_BUTTON_" + LEFT_ANALOG + "_X")) {
-                leftAnalog.x = preferences.getFloat("VC_BUTTON_" + LEFT_ANALOG + "_X", leftAnalog.x);
-                leftAnalog.y = preferences.getFloat("VC_BUTTON_" + LEFT_ANALOG + "_Y", leftAnalog.y);
+            if (preferences.contains("VC_BUTTON_" + LEFT_ANALOG + "_X") &&
+                preferences.contains("VC_BUTTON_" + LEFT_ANALOG + "_Y")) {
+                leftAnalog.x = ControlLayoutPolicy.decodeCoordinate(
+                    preferences.getFloat("VC_BUTTON_" + LEFT_ANALOG + "_X", normalized ? 0.5F : leftAnalog.x),
+                    width, normalized, leftAnalog.radius);
+                leftAnalog.y = ControlLayoutPolicy.decodeCoordinate(
+                    preferences.getFloat("VC_BUTTON_" + LEFT_ANALOG + "_Y", normalized ? 0.5F : leftAnalog.y),
+                    height, normalized, leftAnalog.radius);
             }
-            if (preferences.contains("VC_BUTTON_" + RIGHT_ANALOG + "_X")) {
-                rightAnalog.x = preferences.getFloat("VC_BUTTON_" + RIGHT_ANALOG + "_X", rightAnalog.x);
-                rightAnalog.y = preferences.getFloat("VC_BUTTON_" + RIGHT_ANALOG + "_Y", rightAnalog.y);
+            if (preferences.contains("VC_BUTTON_" + RIGHT_ANALOG + "_X") &&
+                preferences.contains("VC_BUTTON_" + RIGHT_ANALOG + "_Y")) {
+                rightAnalog.x = ControlLayoutPolicy.decodeCoordinate(
+                    preferences.getFloat("VC_BUTTON_" + RIGHT_ANALOG + "_X", normalized ? 0.5F : rightAnalog.x),
+                    width, normalized, rightAnalog.radius);
+                rightAnalog.y = ControlLayoutPolicy.decodeCoordinate(
+                    preferences.getFloat("VC_BUTTON_" + RIGHT_ANALOG + "_Y", normalized ? 0.5F : rightAnalog.y),
+                    height, normalized, rightAnalog.radius);
             }
-            if (preferences.contains("VC_BUTTON_DPAD_X")) {
-                dpad.x = preferences.getFloat("VC_BUTTON_DPAD_X", dpad.x);
-                dpad.y = preferences.getFloat("VC_BUTTON_DPAD_Y", dpad.y);
+            if (preferences.contains("VC_BUTTON_DPAD_X") && preferences.contains("VC_BUTTON_DPAD_Y")) {
+                dpad.x = ControlLayoutPolicy.decodeCoordinate(
+                    preferences.getFloat("VC_BUTTON_DPAD_X", normalized ? 0.5F : dpad.x),
+                    width, normalized, dpad.radius);
+                dpad.y = ControlLayoutPolicy.decodeCoordinate(
+                    preferences.getFloat("VC_BUTTON_DPAD_Y", normalized ? 0.5F : dpad.y),
+                    height, normalized, dpad.radius);
             }
         }
     }

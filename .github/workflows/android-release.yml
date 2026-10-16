@@ -8,6 +8,13 @@ on:
       - main
     paths:
       - 'ports/android/**'
+      - 'runtime/**'
+      - 'tools/oot3d/native_game_runtime/**'
+      - 'tools/android/**'
+      - 'tools/triaevum_release/**'
+      - 'scripts/build-android-*.sh'
+      - 'CMakeLists.txt'
+      - 'source.zip'
       - '.github/workflows/android-release.yml'
   pull_request:
     paths:
