@@ -6309,6 +6309,18 @@ void RunOot3dNativeA32Window(const Oot3dNativeGameLaunch &launch) {
       quickSavePending = false;
       const bool loaded = loadState(quickStatePath);
 #if defined(__ANDROID__)
+      if (loaded) {
+        // Discard any held host input from the pre-load timeline so a restored
+        // state cannot immediately continue a stale direction/button press.
+        androidStateCommands.buttons.store(0, std::memory_order_relaxed);
+        androidStateCommands.circlePadX.store(0.0f, std::memory_order_relaxed);
+        androidStateCommands.circlePadY.store(0.0f, std::memory_order_relaxed);
+        androidStateCommands.cStickX.store(0.0f, std::memory_order_relaxed);
+        androidStateCommands.cStickY.store(0.0f, std::memory_order_relaxed);
+        androidStateCommands.touchPressed.store(false, std::memory_order_relaxed);
+        androidStateCommands.touchX.store(0.0f, std::memory_order_relaxed);
+        androidStateCommands.touchY.store(0.0f, std::memory_order_relaxed);
+      }
       if (androidQuickLoadCommandPending) {
         androidStateCommands.quickStateStatus.store(
             loaded ? AndroidQuickStateStatus::Loaded : AndroidQuickStateStatus::Failed,
