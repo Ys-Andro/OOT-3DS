@@ -10,6 +10,9 @@
 
 namespace Ship {
 
+// Sets the output gain for this game only; does not alter Android media volume.
+void SetAndroidGameVolumePercent(int percent) noexcept;
+
 /**
  * @brief Native Android AudioPlayer implementation backed by the AAudio NDK API.
  *

@@ -6,6 +6,13 @@
 #include <cstring>
 
 namespace Ship {
+namespace {
+std::atomic<int> gAndroidGameVolumePercent{100};
+}
+
+void SetAndroidGameVolumePercent(int percent) noexcept {
+    gAndroidGameVolumePercent.store(std::clamp(percent, 0, 100), std::memory_order_relaxed);
+}
 
 AAudioAudioPlayer::AAudioAudioPlayer(AudioSettings settings)
     : AudioPlayer(settings), mInitialized(false), mNeedsRestart(false) {
@@ -216,6 +223,20 @@ aaudio_data_callback_result_t AAudioAudioPlayer::OnAudioData(void* audioData, in
     // Zero-fill underrun frames to prevent stuttering/noise artifacts
     if (bytesToCopy < bytesNeeded) {
         std::memset(output + bytesToCopy, 0, bytesNeeded - bytesToCopy);
+    }
+
+    // Apply this game's gain after dequeueing PCM. The callback consumes the
+    // same amount of audio at every volume, including mute, so timing stays stable.
+    const int volumePercent = gAndroidGameVolumePercent.load(std::memory_order_relaxed);
+    if (volumePercent == 0) {
+        std::memset(output, 0, bytesNeeded);
+    } else if (volumePercent < 100) {
+        auto* samples = reinterpret_cast<int16_t*>(output);
+        const size_t sampleCount = bytesNeeded / sizeof(int16_t);
+        for (size_t i = 0; i < sampleCount; ++i) {
+            const int32_t scaled = static_cast<int32_t>(samples[i]) * volumePercent / 100;
+            samples[i] = static_cast<int16_t>(scaled);
+        }
     }
 
     return AAUDIO_CALLBACK_RESULT_CONTINUE;

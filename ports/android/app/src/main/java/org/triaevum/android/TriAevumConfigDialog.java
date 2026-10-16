@@ -50,6 +50,8 @@ public final class TriAevumConfigDialog extends Dialog {
     // Geral
     private Spinner mSpLanguage;
     private Spinner mSpSurfaceRes;
+    private SeekBar mSbGameVolume;
+    private TextView mTvGameVolumeLabel;
 
     // Gráficos
     private Spinner mSpRenderScale;
@@ -148,6 +150,8 @@ public final class TriAevumConfigDialog extends Dialog {
         // Geral
         mSpLanguage   = findViewById(R.id.sp_language);
         mSpSurfaceRes = findViewById(R.id.sp_surface_resolution);
+        mSbGameVolume = findViewById(R.id.sb_game_volume);
+        mTvGameVolumeLabel = findViewById(R.id.tv_game_volume_label);
 
         // Gráficos
         mSpRenderScale    = findViewById(R.id.sp_render_scale);
@@ -219,6 +223,19 @@ public final class TriAevumConfigDialog extends Dialog {
                 break;
             }
         }
+
+        // Game audio volume
+        int gameVolumePercent = Math.max(0, Math.min(100,
+            mPrefs.getInt("TriAevum_GameVolumePercent", 100)));
+        mSbGameVolume.setProgress(gameVolumePercent);
+        mTvGameVolumeLabel.setText("Volumen del juego: " + gameVolumePercent + "%");
+        mSbGameVolume.setOnSeekBarChangeListener(new SeekBar.OnSeekBarChangeListener() {
+            @Override public void onProgressChanged(SeekBar sb, int progress, boolean fromUser) {
+                mTvGameVolumeLabel.setText("Volumen del juego: " + progress + "%");
+            }
+            @Override public void onStartTrackingTouch(SeekBar sb) {}
+            @Override public void onStopTrackingTouch(SeekBar sb) {}
+        });
 
         // Render scale
         setupSpinner(mSpRenderScale, TriAevumConfigManager.RENDER_SCALE_LABELS, null);
@@ -496,6 +513,7 @@ public final class TriAevumConfigDialog extends Dialog {
                 .putInt("TriAevum_DisplaySizePercent", 100)
                 .putInt("TriAevum_CustomWidthPercent", 100)
                 .putInt("TriAevum_CustomHeightPercent", 100)
+                .putInt("TriAevum_GameVolumePercent", 100)
                 .putBoolean("EmulationMenuSettings_ShowOverlay", true)
                 .putBoolean("EmulationMenuSettings_HapticFeedback", true)
                 .putBoolean("EmulationMenuSettings_SwapScreens", false)
@@ -503,6 +521,11 @@ public final class TriAevumConfigDialog extends Dialog {
                 .putBoolean("EmulationMenuSettings_JoystickRelCenter", true)
                 .putBoolean("EmulationMenuSettings_DpadSlideEnable", true)
                 .apply();
+            try {
+                TriAevumActivity.nativeSetGameVolume(100);
+            } catch (Throwable t) {
+                Log.w(TAG, "Failed to restore default game volume", t);
+            }
             if (mOverlay != null) {
                 mOverlay.setEditing(false);
                 mOverlay.resetCustomLayout();
@@ -541,6 +564,14 @@ public final class TriAevumConfigDialog extends Dialog {
             int edge = TriAevumConfigManager.SURFACE_RES_VALUES[resIdx];
             Log.d(TAG, "  SET surfaceMaxShortEdge -> " + edge);
             mConfig.setSurfaceMaxShortEdge(edge);
+        }
+
+        int gameVolumePercent = Math.max(0, Math.min(100, mSbGameVolume.getProgress()));
+        mPrefs.edit().putInt("TriAevum_GameVolumePercent", gameVolumePercent).apply();
+        try {
+            TriAevumActivity.nativeSetGameVolume(gameVolumePercent);
+        } catch (Throwable t) {
+            Log.w(TAG, "Failed to apply game-volume setting", t);
         }
 
         // Gráficos

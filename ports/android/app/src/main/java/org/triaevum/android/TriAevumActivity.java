@@ -37,6 +37,7 @@ public final class TriAevumActivity extends Activity {
 
     // JNI Native bindings
     public static native void nativeSetStoragePath(String path);
+    public static native void nativeSetGameVolume(int percent);
     public static native void nativePrepareSession();
     public static native void nativeRequestShutdown();
     public static native void nativeShutdownIdleHost();
@@ -85,6 +86,15 @@ public final class TriAevumActivity extends Activity {
         File root = getExternalFilesDir(null);
         if (root != null) {
             nativeSetStoragePath(root.getAbsolutePath());
+            try {
+                android.content.SharedPreferences prefs = getApplicationContext()
+                    .getSharedPreferences("org.triaevum.android_preferences", Context.MODE_PRIVATE);
+                int volumePercent = Math.max(0, Math.min(100,
+                    prefs.getInt("TriAevum_GameVolumePercent", 100)));
+                nativeSetGameVolume(volumePercent);
+            } catch (Throwable error) {
+                Log.w(TAG, "Failed to apply saved game-volume preference", error);
+            }
             exportHudLayoutFromXml(root);
         }
 

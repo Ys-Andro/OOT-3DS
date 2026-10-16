@@ -17,6 +17,7 @@
 #include <nlohmann/json.hpp>
 #include <ship/Context.h>
 #include <ship/config/Config.h>
+#include <ship/audio/AAudioAudioPlayer.h>
 
 #include "fast/backends/gfx_android.h"
 #include "ship/utils/ShutdownRequest.h"
@@ -213,6 +214,12 @@ Java_org_triaevum_android_TriAevumConfigManager_nativeReloadGraphicsSettings(
 }
 
 // Native activity lifecycle and surface management (replacing SDLActivity)
+
+JNIEXPORT void JNICALL
+Java_org_triaevum_android_TriAevumActivity_nativeSetGameVolume(
+    JNIEnv * /*env*/, jclass /*clazz*/, jint percent) {
+  Ship::SetAndroidGameVolumePercent(static_cast<int>(percent));
+}
 
 JNIEXPORT void JNICALL
 Java_org_triaevum_android_TriAevumActivity_nativePrepareSession(

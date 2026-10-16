@@ -245,6 +245,42 @@
                             android:paddingRight="10dp" />
                     </LinearLayout>
 
+                    <!-- Independent in-game audio volume -->
+                    <LinearLayout
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:background="@drawable/card_bg"
+                        android:orientation="vertical"
+                        android:padding="12dp"
+                        android:layout_marginBottom="8dp">
+
+                        <TextView
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:text="AUDIO DEL JUEGO"
+                            android:textColor="#FFC107"
+                            android:textSize="11sp"
+                            android:textStyle="bold"
+                            android:layout_marginBottom="8dp" />
+
+                        <TextView
+                            android:id="@+id/tv_game_volume_label"
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:text="Volumen del juego: 100%"
+                            android:textColor="#E6ECF5"
+                            android:textSize="12sp"
+                            android:layout_marginBottom="4dp" />
+
+                        <SeekBar
+                            android:id="@+id/sb_game_volume"
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:max="100"
+                            android:progress="100"
+                            android:contentDescription="Volumen independiente del juego" />
+                    </LinearLayout>
+
                 </LinearLayout>
             </ScrollView>
 
