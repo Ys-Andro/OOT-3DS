@@ -15,6 +15,7 @@ on:
       - 'scripts/build-android-*.sh'
       - 'CMakeLists.txt'
       - 'source.zip'
+      - 'docs/ANDROID_OBTAINIUM_RELEASES.md'
       - '.github/workflows/android-release.yml'
   pull_request:
     paths:
@@ -26,6 +27,7 @@ on:
       - 'scripts/build-android-*.sh'
       - 'CMakeLists.txt'
       - 'source.zip'
+      - 'docs/ANDROID_OBTAINIUM_RELEASES.md'
       - '.github/workflows/android-release.yml'
   workflow_dispatch:
     inputs:
