@@ -1,38 +1,40 @@
-package org.triaevum.android.controls;
+package org.triaevum.android.controls
 
-/** Coordinate conversions for persistent touch-control layouts. */
-public final class ControlLayoutPolicy {
+/**
+ * Coordinate conversions for persistent touch-control layouts.
+ * The normalized storage format keeps user layouts stable across resolutions.
+ */
+object ControlLayoutPolicy {
     /** Version 2 stores X/Y as fractions of the current view dimensions. */
-    public static final int NORMALIZED_LAYOUT_VERSION = 2;
+    const val NORMALIZED_LAYOUT_VERSION = 2
 
-    private ControlLayoutPolicy() {}
-
-    public static float encodeCoordinate(float position, float extent) {
-        if (!Float.isFinite(position) || !Float.isFinite(extent) || extent <= 0.0f) {
-            return 0.0f;
-        }
-        return Math.max(0.0f, Math.min(1.0f, position / extent));
+    @JvmStatic
+    fun encodeCoordinate(position: Float, extent: Float): Float {
+        if (!position.isFinite() || !extent.isFinite() || extent <= 0f) return 0f
+        return (position / extent).coerceIn(0f, 1f)
     }
 
     /**
      * Decode a normalized position or a legacy pixel position and keep the
      * control center inside the available view.
      */
-    public static float decodeCoordinate(
-            float savedPosition, float extent, boolean normalized, float margin) {
-        if (!Float.isFinite(extent) || extent <= 0.0f) {
-            return 0.0f;
-        }
-        float decoded;
-        if (!Float.isFinite(savedPosition)) {
-            decoded = extent * 0.5f;
+    @JvmStatic
+    fun decodeCoordinate(
+        savedPosition: Float,
+        extent: Float,
+        normalized: Boolean,
+        margin: Float
+    ): Float {
+        if (!extent.isFinite() || extent <= 0f) return 0f
+        val decoded = if (!savedPosition.isFinite()) {
+            extent * 0.5f
+        } else if (normalized) {
+            savedPosition.coerceIn(0f, 1f) * extent
         } else {
-            decoded = normalized
-                    ? Math.max(0.0f, Math.min(1.0f, savedPosition)) * extent
-                    : savedPosition;
+            savedPosition
         }
-        float requestedMargin = Float.isFinite(margin) ? Math.max(0.0f, margin) : 0.0f;
-        float safeMargin = Math.min(requestedMargin, extent * 0.5f);
-        return Math.max(safeMargin, Math.min(extent - safeMargin, decoded));
+        val requestedMargin = if (margin.isFinite()) margin.coerceAtLeast(0f) else 0f
+        val safeMargin = requestedMargin.coerceAtMost(extent * 0.5f)
+        return decoded.coerceIn(safeMargin, extent - safeMargin)
     }
 }
