@@ -1,10 +1,14 @@
 # Android Native Foundation
 
-Status: developer APK now links and launches the actual ARM64 title/runtime with
-Vulkan/NRI. Two-minute warm-cache intro samples reach 30 presentations/s and
-29.0-29.8 native updates/s without interpolation on Adreno 830. Residual pacing spikes,
-gameplay, input and installer integration remain; this is not a supported release.
-See [intro bring-up and reproduction](INTRO.md) for current results and commands.
+Status (2026-10-16): experimental Android APK with an ARM64 native runtime and
+Vulkan/NRI renderer. Configuration includes viewport aspect ratio/size, custom
+viewport dimensions, movable touch controls, a black letterbox background, and
+an independent game-volume slider. The launcher also wires normal Citra save-file
+import with a backup, and Settings now exposes the native runtime's quick-state
+capture/restore path (`quick.oot3dsav`). These recent UI/runtime additions still
+need the current remote build and physical-device validation before being called
+stable. The repository is not yet a qualified, fully playable release.
+See [intro bring-up and reproduction](INTRO.md) for prior measured results and commands.
 See [shader preparation](SHADER_PREPARATION.md) for device/cache qualification.
 Build on Linux with the Android NDK; the existing Windows PC may provide the USB
 ADB connection without hosting a second compiler/SDK installation.
@@ -21,8 +25,11 @@ ADB connection without hosting a second compiler/SDK installation.
   belong to the Android host, outside title logic and canonical PICA semantics.
 - The publisher cross-compiles the existing manifest-verified translated C++
   title for `arm64-v8a`. No x86 module is reused. Players do not install a compiler.
-- ROM import must use Android's document picker and a native import service.
-  Document URIs are not filesystem paths. The desktop Tk Forge UI is not ported.
+- ROM import and save import use Android's document picker; document URIs are not
+  filesystem paths. The save importer copies matching normal Citra save files and
+  backs up existing native save files before replacing them. Quick states are
+  separate runtime snapshots and are not interchangeable with Citra save files.
+  The desktop Tk Forge UI is not part of the Android app.
 - The release catalog deliberately does not advertise Android yet. An ARM64
   library that links is not proof of renderer presentation or playable boot.
 
@@ -70,8 +77,15 @@ it does not create an Android window or present a game frame.
 The isolated [Azahar controls library](controls/README.md) imports the original
 overlay and controller artwork with a narrow native-3DS input adapter. Its AAR
 and adapter tests build independently of all C++ title/renderer compilation.
-The SDL APK host exists; live-game overlay integration is deliberately deferred
-until title-intro playback works.
+The Android Activity currently hosts the native surface plus the virtual-control
+overlay and in-process configuration dialog. It persists manual viewport sizing
+and normalized touch-control positions. Overlay/input geometry and controller
+behavior must still be qualified across rotations and physical devices.
+
+The runtime's native save-state engine already captures guest memory/process,
+CTR host services, DSP-HLE and native PICA presentation state. Android Settings
+requests quick save/load on a frame boundary; successful capture/restore and
+failure cases require on-device regression testing.
 
 ## Device Verification
 
@@ -94,14 +108,23 @@ It is not a framebuffer or performance test. The actual renderer wraps a device
 with its own capability negotiation; the standalone NRI creation defaults are
 not an authoritative mobile device-compatibility gate.
 
-## Next Deliverable
+## Next Validation Gate
 
-1. Complete and validate intro presentation through the APK/SDL host; qualify
-   surface recreation, pause/resume and audio lifecycle afterward.
-2. Wire the imported Azahar overlay, settings editor and shared input owner.
-3. Add ROM selection/import and package the precompiled ARM64 title and runtime.
-4. Test real on-device startup, native framebuffer output, audio, input and
-   resume. Qualify capability requirements and performance on actual hardware.
+1. Require successful CI for the current native, Android controls, JNI and APK
+   changes; inspect compiler/test failures before treating a build as releasable.
+2. On the POCO M7 / Adreno 610, test cold and warm launch, actual rendered
+   gameplay, audio/volume, touchscreen and physical-controller releases, viewport
+   scaling, rotation, background/resume, shutdown and relaunch.
+3. Verify normal Citra-save import, backup behavior, native in-game save/reload,
+   quick-state creation and restore at multiple gameplay/menu states. Keep
+   independent copies of valuable save files until this passes.
+4. Review device logs and sustained frame pacing, then resolve renderer or
+   Android lifecycle failures before calling the build stable.
+5. The current Android renderer is still Vulkan/NRI. OpenGL ES is a separate
+   renderer project and must not be presented as implemented or as a simple
+   configuration switch. Stable Obtainium releases also require one persistent
+   Android signing keystore configured as the four repository Actions secrets;
+   see [Obtainium release setup](../../docs/ANDROID_OBTAINIUM_RELEASES.md).
 
 Keep the currently installed Linux Flatpak and desktop distribution untouched.
 Toolchains, ROMs, game-derived data and build directories are never public source
