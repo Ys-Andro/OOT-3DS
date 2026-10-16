@@ -32,6 +32,8 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
 import java.nio.file.Files;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Locale;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
@@ -257,6 +259,8 @@ public class TriAevumDownloadActivity extends Activity {
             }
             File saveDir = new File(root, "savedata");
             File stagingDir = new File(root, "citra_import_staging_" + System.currentTimeMillis());
+            File backupDir = null;
+            List<File> changedDestinations = new ArrayList<>();
             try {
                 DocumentFile picked = DocumentFile.fromTreeUri(this, treeUri);
                 if (picked == null || !picked.exists() || !picked.isDirectory()) {
@@ -309,7 +313,7 @@ public class TriAevumDownloadActivity extends Activity {
                 for (File staged : stagedFiles) {
                     if (new File(saveDir, staged.getName()).exists()) needsBackup = true;
                 }
-                File backupDir = new File(saveDir, "backup_citra_import_" + System.currentTimeMillis());
+                backupDir = new File(saveDir, "backup_citra_import_" + System.currentTimeMillis());
                 if (needsBackup && !backupDir.mkdirs()) {
                     throw new IOException("No se pudo crear la copia de seguridad de la partida actual.");
                 }
@@ -324,6 +328,9 @@ public class TriAevumDownloadActivity extends Activity {
                     File destination = new File(saveDir, staged.getName());
                     File temp = new File(saveDir, staged.getName() + ".importing");
                     copyLocalFile(staged, temp);
+                    // Journal the destination before removing an old file. If
+                    // any later file fails, rollback restores the whole set.
+                    changedDestinations.add(destination);
                     if (destination.exists() && !destination.delete()) {
                         throw new IOException("No se pudo reemplazar " + destination.getName());
                     }
@@ -340,8 +347,41 @@ public class TriAevumDownloadActivity extends Activity {
                     + backupMessage + " Inicia el juego para comprobar la compatibilidad.", true);
             } catch (Exception e) {
                 Log.e(TAG, "Error al importar la partida de Citra", e);
-                finishSaveImportUi("No se importó la partida: " + e.getMessage(), false);
+                String rollbackFailure = null;
+                // Undo every destination modified before the failure. If a
+                // destination did not previously exist, remove the partial file;
+                // otherwise restore its backup and preserve the original save.
+                for (int i = changedDestinations.size() - 1; i >= 0; --i) {
+                    File destination = changedDestinations.get(i);
+                    File backup = backupDir == null ? null : new File(backupDir, destination.getName());
+                    try {
+                        if (destination.exists() && !destination.delete()) {
+                            throw new IOException("No se pudo retirar el archivo parcial " + destination.getName());
+                        }
+                        if (backup != null && backup.isFile()) {
+                            copyLocalFile(backup, destination);
+                        }
+                    } catch (Exception rollbackError) {
+                        Log.e(TAG, "Error al restaurar " + destination.getName(), rollbackError);
+                        if (rollbackFailure == null) rollbackFailure = destination.getName();
+                        else rollbackFailure += ", " + destination.getName();
+                    }
+                }
+                String rollbackMessage = rollbackFailure == null
+                    ? " Se restauró el estado anterior de la importación."
+                    : " ADVERTENCIA: no se pudieron restaurar todos los archivos (" + rollbackFailure
+                        + "). Conserva la carpeta de backup antes de volver a intentarlo.";
+                finishSaveImportUi("No se importó la partida: " + e.getMessage() + rollbackMessage, false);
             } finally {
+                File[] stagedForCleanup = stagingDir.listFiles();
+                if (stagedForCleanup != null) {
+                    for (File staged : stagedForCleanup) {
+                        File temp = new File(saveDir, staged.getName() + ".importing");
+                        if (temp.isFile() && !temp.delete()) {
+                            Log.w(TAG, "Could not remove incomplete import file: " + temp.getName());
+                        }
+                    }
+                }
                 deleteRecursively(stagingDir);
             }
         });
