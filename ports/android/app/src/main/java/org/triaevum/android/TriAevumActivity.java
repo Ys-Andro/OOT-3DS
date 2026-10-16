@@ -360,8 +360,11 @@ public final class TriAevumActivity extends Activity {
                 if (lTrigger == 0.0f) lTrigger = event.getAxisValue(android.view.MotionEvent.AXIS_BRAKE);
                 float rTrigger = event.getAxisValue(android.view.MotionEvent.AXIS_RTRIGGER);
                 if (rTrigger == 0.0f) rTrigger = event.getAxisValue(android.view.MotionEvent.AXIS_GAS);
-                if (lTrigger > 0.5f) mInputTarget.button(1 << 14, true);
-                if (rTrigger > 0.5f) mInputTarget.button(1 << 15, true);
+                // Axis-backed triggers must emit both press and release.
+                // Previously only the pressed edge was sent, leaving L2/R2
+                // stuck until another input path happened to release the bit.
+                mInputTarget.button(1 << 14, lTrigger > 0.5f);
+                mInputTarget.button(1 << 15, rTrigger > 0.5f);
 
                 return true;
             }
